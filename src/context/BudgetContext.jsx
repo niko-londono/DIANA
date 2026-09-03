@@ -71,6 +71,7 @@ function budgetReducer(state, action) {
 export function BudgetProvider({ children }) {
   const [state, dispatch] = useReducer(budgetReducer, { categories: [] });
   const [isLoading, setIsLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState("saved"); // "saved", "saving", "error"
   const isFirstRender = useRef(true);
 
   // 1. Cargar datos desde Google Sheets al iniciar
@@ -113,6 +114,7 @@ export function BudgetProvider({ children }) {
     localStorage.setItem("finanzas_backup", JSON.stringify(state.categories));
 
     // Guardar en Google Sheets en segundo plano
+    setSyncStatus("saving");
     async function syncData() {
       try {
         await fetch(SCRIPT_URL, {
@@ -122,8 +124,10 @@ export function BudgetProvider({ children }) {
           },
           body: JSON.stringify({ categories: state.categories })
         });
+        setSyncStatus("saved");
       } catch (e) {
         console.error("Error al sincronizar con Google Sheets:", e);
+        setSyncStatus("error");
       }
     }
     
@@ -156,7 +160,8 @@ export function BudgetProvider({ children }) {
         totalExpenses,
         remainingBalance,
         dispatch,
-        isLoading
+        isLoading,
+        syncStatus
       }}
     >
       {children}
