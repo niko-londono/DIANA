@@ -1,0 +1,22 @@
+/* ═══════════════════════════════════════════════════
+   Overview Page Styles
+   ═══════════════════════════════════════════════════ */
+
+.page-header {
+  margin-bottom: 1.75rem;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.2rem;
+}
+
+.page-breadcrumb {
+  font-size: 0.825rem;
+  color: var(--color-text-light);
+  font-weight: 500;
+}
