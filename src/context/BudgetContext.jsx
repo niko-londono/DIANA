@@ -1,8 +1,8 @@
-import { createContext, useContext, useReducer, useEffect } from "react";
+import { createContext, useContext, useReducer, useEffect, useState, useRef } from "react";
 
 const BudgetContext = createContext(null);
 
-const STORAGE_KEY = "finanzas_budget_data";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2GE95BLK0ATcberMo8zZ4dIwMwcKjPzeHXnrKQA8C5DNE_yjnVgDeW4j0xDSzfmyP/exec";
 
 const DEFAULT_CATEGORIES = [
   { id: "sueldo", name: "Sueldo", budgeted: 96228, parentId: null, canDelete: false, expanded: true },
@@ -12,26 +12,11 @@ const DEFAULT_CATEGORIES = [
   { id: "casa", name: "Casa(Inversion)", budgeted: 14519, parentId: null, canDelete: true, expanded: false },
 ];
 
-function loadFromStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.warn("Failed to load budget data from localStorage:", e);
-  }
-  return null;
-}
-
-function saveToStorage(state) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {
-    console.warn("Failed to save budget data:", e);
-  }
-}
-
 function budgetReducer(state, action) {
   switch (action.type) {
+    case "SET_CATEGORIES": {
+      return { ...state, categories: action.payload };
+    }
     case "ADD_CATEGORY": {
       const newCat = {
         id: action.payload.name.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now(),
@@ -84,16 +69,73 @@ function budgetReducer(state, action) {
 }
 
 export function BudgetProvider({ children }) {
-  const saved = loadFromStorage();
-  const initialState = saved || { categories: DEFAULT_CATEGORIES };
+  const [state, dispatch] = useReducer(budgetReducer, { categories: [] });
+  const [isLoading, setIsLoading] = useState(true);
+  const isFirstRender = useRef(true);
 
-  const [state, dispatch] = useReducer(budgetReducer, initialState);
-
+  // 1. Cargar datos desde Google Sheets al iniciar
   useEffect(() => {
-    saveToStorage(state);
-  }, [state]);
+    async function fetchData() {
+      try {
+        const response = await fetch(SCRIPT_URL);
+        const data = await response.json();
+        if (data && data.categories && data.categories.length > 0) {
+          dispatch({ type: "SET_CATEGORIES", payload: data.categories });
+        } else {
+          // Si la hoja está vacía, cargar las por defecto
+          dispatch({ type: "SET_CATEGORIES", payload: DEFAULT_CATEGORIES });
+        }
+      } catch (e) {
+        console.error("Error al cargar desde Google Sheets:", e);
+        // Fallback a localStorage si falla la conexión
+        const local = localStorage.getItem("finanzas_backup");
+        if (local) {
+          dispatch({ type: "SET_CATEGORIES", payload: JSON.parse(local) });
+        } else {
+          dispatch({ type: "SET_CATEGORIES", payload: DEFAULT_CATEGORIES });
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
 
-  // Computed values
+  // 2. Guardar datos en Google Sheets cada vez que cambien
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (isLoading || state.categories.length === 0) return;
+
+    // Guardar backup local rápido
+    localStorage.setItem("finanzas_backup", JSON.stringify(state.categories));
+
+    // Guardar en Google Sheets en segundo plano
+    async function syncData() {
+      try {
+        await fetch(SCRIPT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8",
+          },
+          body: JSON.stringify({ categories: state.categories })
+        });
+      } catch (e) {
+        console.error("Error al sincronizar con Google Sheets:", e);
+      }
+    }
+    
+    // Evitar múltiples peticiones seguidas usando un pequeño debounce
+    const timeoutId = setTimeout(() => {
+      syncData();
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [state.categories, isLoading]);
+
+  // Valores Computados
   const categories = state.categories;
 
   const totalIncome = categories
@@ -114,6 +156,7 @@ export function BudgetProvider({ children }) {
         totalExpenses,
         remainingBalance,
         dispatch,
+        isLoading
       }}
     >
       {children}
