@@ -80,11 +80,25 @@ export function BudgetProvider({ children }) {
       try {
         const response = await fetch(SCRIPT_URL);
         const data = await response.json();
-        if (data && data.categories && data.categories.length > 0) {
+        if (data && Array.isArray(data.categories) && data.categories.length > 0) {
           dispatch({ type: "SET_CATEGORIES", payload: data.categories });
+          localStorage.setItem("finanzas_backup", JSON.stringify(data.categories));
+        } else if (data && data.error) {
+          console.warn("Respuesta de Google Sheets:", data.error);
+          const local = localStorage.getItem("finanzas_backup");
+          if (local) {
+            dispatch({ type: "SET_CATEGORIES", payload: JSON.parse(local) });
+          } else {
+            dispatch({ type: "SET_CATEGORIES", payload: DEFAULT_CATEGORIES });
+          }
         } else {
-          // Si la hoja está vacía, cargar las por defecto
-          dispatch({ type: "SET_CATEGORIES", payload: DEFAULT_CATEGORIES });
+          // Si la hoja está vacía o sin categorías
+          const local = localStorage.getItem("finanzas_backup");
+          if (local) {
+            dispatch({ type: "SET_CATEGORIES", payload: JSON.parse(local) });
+          } else {
+            dispatch({ type: "SET_CATEGORIES", payload: DEFAULT_CATEGORIES });
+          }
         }
       } catch (e) {
         console.error("Error al cargar desde Google Sheets:", e);
@@ -119,6 +133,7 @@ export function BudgetProvider({ children }) {
       try {
         await fetch(SCRIPT_URL, {
           method: "POST",
+          mode: "no-cors",
           headers: {
             "Content-Type": "text/plain;charset=utf-8",
           },
