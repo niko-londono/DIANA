@@ -32,6 +32,51 @@
   gap: 0.5rem;
 }
 
+/* ── Sync Cloud Button ── */
+.sync-cloud-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: all var(--transition);
+}
+
+.sync-cloud-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sync-cloud-btn.saved {
+  color: var(--color-success);
+  border-color: rgba(16, 185, 129, 0.3);
+  background: var(--color-success-bg);
+}
+
+.sync-cloud-btn.saving {
+  color: var(--color-info);
+  border-color: rgba(59, 130, 246, 0.3);
+  background: var(--color-info-bg);
+}
+
+.sync-cloud-btn.error {
+  color: var(--color-danger);
+  border-color: rgba(239, 68, 68, 0.3);
+  background: var(--color-danger-bg);
+}
+
+.spin-icon {
+  animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
 .btn-add-category {
   display: inline-flex;
   align-items: center;

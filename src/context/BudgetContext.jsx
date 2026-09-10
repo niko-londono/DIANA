@@ -146,9 +146,10 @@ export function BudgetProvider({ children }) {
     .filter((c) => c.id === "sueldo")
     .reduce((sum, c) => sum + c.budgeted, 0);
 
+  // Solo sumar categorías top-level (no subcategorías) para evitar doble conteo
   const totalExpenses = categories
-    .filter((c) => c.id !== "sueldo")
-    .reduce((sum, c) => sum + c.budgeted, 0);
+    .filter((c) => c.id !== "sueldo" && c.parentId === null)
+    .reduce((sum, c) => sum + Number(c.budgeted), 0);
 
   const remainingBalance = totalIncome - totalExpenses;
 
