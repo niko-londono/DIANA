@@ -1,112 +1,93 @@
-/* ═══════════════════════════════════════════════════
-   Metric Cards Component Styles
-   ═══════════════════════════════════════════════════ */
-
 .metric-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem;
-  margin-bottom: 1.75rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.15rem;
+  margin-bottom: 1.25rem;
 }
 
 .metric-card {
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  padding: 1.25rem 1.5rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1.15rem 1.25rem;
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition);
-  animation: fadeInUp 0.5s ease-out backwards;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
-
-.metric-card:nth-child(1) { animation-delay: 0.05s; }
-.metric-card:nth-child(2) { animation-delay: 0.1s; }
-.metric-card:nth-child(3) { animation-delay: 0.15s; }
 
 .metric-card:hover {
-  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  border-color: #cbd5e1;
 }
 
-.metric-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-sm);
+.card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.65rem;
+}
+
+.card-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.card-icon-box {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
 }
 
-.metric-icon svg {
-  width: 22px;
-  height: 22px;
-}
-
-.metric-icon.income {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.metric-icon.expense {
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-}
-
-.metric-icon.balance {
-  background: var(--color-info-bg);
-  color: var(--color-info);
-}
-
-.metric-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
-}
-
-.metric-label {
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
-}
-
-.metric-card:nth-child(1) .metric-label { color: var(--color-success); }
-.metric-card:nth-child(2) .metric-label { color: var(--color-warning); }
-.metric-card:nth-child(3) .metric-label { color: var(--color-info); }
-
-.metric-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text);
+.card-amount {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #0f172a;
   letter-spacing: -0.02em;
+  margin-bottom: 0.45rem;
 }
 
-.metric-card:nth-child(1) .metric-value { color: var(--color-success); }
-.metric-card:nth-child(2) .metric-value { color: var(--color-warning); }
-.metric-card:nth-child(3) .metric-value { color: var(--color-info); }
-
-.metric-sub {
-  font-size: 0.7rem;
-  color: var(--color-text-light);
-  font-weight: 400;
+.card-subtext {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
 }
 
-/* ── Responsive ── */
-@media (max-width: 900px) {
+/* Color palettes matching screenshot */
+.bg-emerald-light { background: #ecfdf5; }
+.text-emerald { color: #10b981; }
+.highlight-emerald { color: #10b981; font-weight: 700; }
+
+.bg-indigo-light { background: #eef2ff; }
+.text-indigo { color: #6366f1; }
+.highlight-indigo { color: #6366f1; font-weight: 700; }
+
+.bg-cyan-light { background: #ecfeff; }
+.text-cyan { color: #06b6d4; }
+.highlight-cyan { color: #06b6d4; font-weight: 700; }
+
+.bg-purple-light { background: #faf5ff; }
+.text-purple { color: #a855f7; }
+.highlight-purple { color: #a855f7; font-weight: 700; }
+
+@media (max-width: 960px) {
+  .metric-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 580px) {
   .metric-cards-grid {
     grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-
-  .metric-card {
-    padding: 1rem 1.25rem;
-  }
-
-  .metric-value {
-    font-size: 1.25rem;
   }
 }

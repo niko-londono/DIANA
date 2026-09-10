@@ -1,0 +1,89 @@
+.allocation-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1.15rem 1.35rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+
+.allocation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.allocation-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.allocation-title {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.allocation-subtitle {
+  font-size: 0.8125rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.allocation-legends {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.legend-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* Multi-segment progress bar */
+.multi-progress-bar {
+  width: 100%;
+  height: 12px;
+  background: #f1f5f9;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: flex;
+  padding: 2px;
+  gap: 2px;
+}
+
+.progress-segment {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.progress-segment:first-child {
+  border-top-left-radius: 9999px;
+  border-bottom-left-radius: 9999px;
+}
+
+.progress-segment:last-child {
+  border-top-right-radius: 9999px;
+  border-bottom-right-radius: 9999px;
+}

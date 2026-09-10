@@ -75,6 +75,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ activePage, onNavigate }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
     <>
@@ -99,7 +100,7 @@ export default function Sidebar({ activePage, onNavigate }) {
       />
 
       {/* Sidebar */}
-      <aside className={`sidebar ${isOpen ? "open" : ""}`} id="sidebar">
+      <aside className={`sidebar ${isOpen ? "open" : ""} ${isCollapsed ? "collapsed" : ""}`} id="sidebar">
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -109,7 +110,7 @@ export default function Sidebar({ activePage, onNavigate }) {
               <rect x="3" y="14" width="7" height="7" />
             </svg>
           </div>
-          <span className="sidebar-logo-text">Finanzas</span>
+          {!isCollapsed && <span className="sidebar-logo-text">Finanzas</span>}
         </div>
 
         <nav className="sidebar-nav">
@@ -121,13 +122,33 @@ export default function Sidebar({ activePage, onNavigate }) {
                 onNavigate(item.id);
                 setIsOpen(false);
               }}
+              title={isCollapsed ? item.label : undefined}
               id={`nav-${item.id}`}
             >
               {item.icon}
-              <span>{item.label}</span>
+              {!isCollapsed && <span>{item.label}</span>}
             </button>
           ))}
         </nav>
+
+        {/* Botón colapsar / expandir barra lateral */}
+        <div className="sidebar-collapse-wrapper">
+          <button
+            className="sidebar-collapse-btn"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            title={isCollapsed ? "Expandir menú" : "Colapsar menú"}
+            type="button"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={16} height={16}>
+              {isCollapsed ? (
+                <polyline points="9 18 15 12 9 6" />
+              ) : (
+                <polyline points="15 18 9 12 15 6" />
+              )}
+            </svg>
+            {!isCollapsed && <span>Colapsar</span>}
+          </button>
+        </div>
       </aside>
     </>
   );

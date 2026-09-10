@@ -5,12 +5,109 @@ const BudgetContext = createContext(null);
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2GE95BLK0ATcberMo8zZ4dIwMwcKjPzeHXnrKQA8C5DNE_yjnVgDeW4j0xDSzfmyP/exec";
 
 const DEFAULT_CATEGORIES = [
-  { id: "sueldo", name: "Sueldo", budgeted: 96228, parentId: null, canDelete: false, expanded: true },
-  { id: "carro", name: "Carro", budgeted: 28000, parentId: null, canDelete: true, expanded: true },
-  { id: "viajes", name: "Viajes/Vacaciones", budgeted: 6000, parentId: null, canDelete: true, expanded: false },
-  { id: "gastos-m", name: "Gastos M", budgeted: 47000, parentId: null, canDelete: true, expanded: true },
-  { id: "casa", name: "Casa(Inversion)", budgeted: 14519, parentId: null, canDelete: true, expanded: false },
+  {
+    id: "sueldo",
+    name: "Sueldo",
+    budgeted: 17000,
+    parentId: null,
+    canDelete: false,
+    expanded: true,
+    type: "Ingreso Base",
+    subtext: "Ingreso recurrente de nómina",
+    icon: "cash"
+  },
+  {
+    id: "gastos-m",
+    name: "Gastos M",
+    budgeted: 15000,
+    parentId: null,
+    canDelete: true,
+    expanded: true,
+    type: "Gasto Fijo",
+    subtext: "Renta, servicios, despensa y compromisos fijos",
+    icon: "home"
+  },
+  {
+    id: "viajes",
+    name: "Viajes/Vacaciones",
+    budgeted: 1000,
+    parentId: null,
+    canDelete: true,
+    expanded: false,
+    type: "Estilo de Vida",
+    subtext: "Escapadas, boletos y fondo vacacional",
+    icon: "travel"
+  },
+  {
+    id: "ahorro",
+    name: "AHORRO",
+    budgeted: 1000,
+    parentId: null,
+    canDelete: true,
+    expanded: false,
+    type: "Patrimonio",
+    subtext: "Inversión mensual y fondo de resguardo",
+    icon: "savings"
+  }
 ];
+
+export function getCategoryMeta(cat) {
+  if (!cat) return { type: "Gasto", subtext: "", icon: "default", badgeCls: "badge-variable", color: "#64748b", bgColor: "#f1f5f9" };
+  
+  if (cat.id === "sueldo" || (cat.name && cat.name.toLowerCase().includes("sueldo"))) {
+    return {
+      type: cat.type || "Ingreso Base",
+      subtext: cat.subtext || "Ingreso recurrente de nómina",
+      icon: cat.icon || "cash",
+      badgeCls: "badge-income",
+      color: "#10b981",
+      bgColor: "#ecfdf5"
+    };
+  }
+
+  const n = (cat.name || "").toLowerCase();
+  const t = (cat.type || "").toLowerCase();
+
+  if (t.includes("fijo") || n.includes("gasto") || n.includes("casa") || n.includes("renta") || n.includes("servicios")) {
+    return {
+      type: cat.type || "Gasto Fijo",
+      subtext: cat.subtext || "Renta, servicios, despensa y compromisos fijos",
+      icon: cat.icon || "home",
+      badgeCls: "badge-fixed",
+      color: "#6366f1",
+      bgColor: "#eef2ff"
+    };
+  }
+  if (t.includes("vida") || t.includes("estilo") || n.includes("viaje") || n.includes("vaca") || n.includes("ocio")) {
+    return {
+      type: cat.type || "Estilo de Vida",
+      subtext: cat.subtext || "Escapadas, boletos y fondo vacacional",
+      icon: cat.icon || "travel",
+      badgeCls: "badge-lifestyle",
+      color: "#06b6d4",
+      bgColor: "#ecfeff"
+    };
+  }
+  if (t.includes("patrimonio") || t.includes("ahorro") || n.includes("ahorro") || n.includes("invers") || n.includes("fondo")) {
+    return {
+      type: cat.type || "Patrimonio",
+      subtext: cat.subtext || "Inversión mensual y fondo de resguardo",
+      icon: cat.icon || "savings",
+      badgeCls: "badge-wealth",
+      color: "#a855f7",
+      bgColor: "#faf5ff"
+    };
+  }
+
+  return {
+    type: cat.type || "Gasto Variable",
+    subtext: cat.subtext || "Asignación presupuestaria mensual",
+    icon: cat.icon || "default",
+    badgeCls: "badge-variable",
+    color: "#3b82f6",
+    bgColor: "#eff6ff"
+  };
+}
 
 function budgetReducer(state, action) {
   switch (action.type) {
@@ -19,20 +116,41 @@ function budgetReducer(state, action) {
     }
     case "ADD_CATEGORY": {
       const newCat = {
-        id: action.payload.name.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now(),
+        id: action.payload.id || action.payload.name.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now(),
         name: action.payload.name,
-        budgeted: action.payload.budgeted || 0,
+        budgeted: Number(action.payload.budgeted) || 0,
         parentId: action.payload.parentId || null,
-        canDelete: true,
+        canDelete: action.payload.canDelete !== false,
         expanded: false,
+        type: action.payload.type || "Gasto Fijo",
+        subtext: action.payload.subtext || "Asignación presupuestaria mensual",
+        icon: action.payload.icon || "default"
       };
       return { ...state, categories: [...state.categories, newCat] };
+    }
+    case "UPDATE_CATEGORY": {
+      return {
+        ...state,
+        categories: state.categories.map((cat) =>
+          cat.id === action.payload.id
+            ? {
+                ...cat,
+                name: action.payload.name !== undefined ? action.payload.name : cat.name,
+                budgeted: action.payload.budgeted !== undefined ? Number(action.payload.budgeted) : cat.budgeted,
+                parentId: action.payload.parentId !== undefined ? action.payload.parentId : cat.parentId,
+                type: action.payload.type !== undefined ? action.payload.type : cat.type,
+                subtext: action.payload.subtext !== undefined ? action.payload.subtext : cat.subtext,
+                icon: action.payload.icon !== undefined ? action.payload.icon : cat.icon
+              }
+            : cat
+        )
+      };
     }
     case "UPDATE_BUDGET": {
       return {
         ...state,
         categories: state.categories.map((cat) =>
-          cat.id === action.payload.id ? { ...cat, budgeted: action.payload.budgeted } : cat
+          cat.id === action.payload.id ? { ...cat, budgeted: Number(action.payload.budgeted) || 0 } : cat
         ),
       };
     }

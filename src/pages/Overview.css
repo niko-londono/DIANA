@@ -1,83 +1,12 @@
-/* ═══════════════════════════════════════════════════
-   Overview Page Styles
-   ═══════════════════════════════════════════════════ */
-
-.page-header {
-  margin-bottom: 1.75rem;
-  animation: fadeIn 0.4s ease-out;
+.overview-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0.5rem 0 2rem 0;
+  animation: fadeIn 0.3s ease-out;
 }
 
-.page-header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.page-title {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--color-text);
-  letter-spacing: -0.02em;
-  margin-bottom: 0;
-}
-
-.page-header-sub {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.page-breadcrumb {
-  font-size: 0.825rem;
-  color: var(--color-text-light);
-  font-weight: 500;
-}
-
-/* ── Sync Indicator ── */
-/* Pequeño, discreto, junto al breadcrumb */
-.sync-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  opacity: 0.85;
-}
-
-.sync-indicator svg {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-}
-
-.sync-indicator span {
-  font-size: 0.72rem;
-}
-
-.sync-indicator.saved {
-  color: var(--color-success);
-}
-
-.sync-indicator.saving {
-  color: var(--color-info);
-}
-
-.sync-indicator.error {
-  color: var(--color-danger);
-}
-
-/* ── Separador visual entre breadcrumb y sync ── */
-.page-header-sub .page-breadcrumb::after {
-  content: "·";
-  margin-left: 0.75rem;
-  color: var(--color-text-light);
-}
-
-.spin-icon {
-  animation: spin 1.2s linear infinite;
-}
-
-@keyframes spin {
-  100% { transform: rotate(360deg); }
+@media (max-width: 768px) {
+  .overview-container {
+    padding: 0.25rem 0 1.5rem 0;
+  }
 }

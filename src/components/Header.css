@@ -1,0 +1,170 @@
+.dashboard-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 0;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.topbar-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+}
+
+.topbar-titles {
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar-subtitle {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.topbar-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Sync status badge */
+.sync-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+
+.sync-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  display: inline-block;
+}
+
+.sync-pill.saving .sync-dot {
+  background: #f59e0b;
+  animation: pulse 1s infinite;
+}
+
+.sync-pill.error .sync-dot {
+  background: #ef4444;
+}
+
+.sync-cloud-icon {
+  color: #64748b;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* Month dropdown */
+.month-selector-wrapper {
+  position: relative;
+}
+
+.month-selector-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #1e293b;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.month-selector-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.dropdown-arrow {
+  color: #64748b;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.month-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 170px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12);
+  padding: 0.35rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.month-option {
+  text-align: left;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #334155;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.month-option:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.month-option.active {
+  background: #ecfdf5;
+  color: #059669;
+}
