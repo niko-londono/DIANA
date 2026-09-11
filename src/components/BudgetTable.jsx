@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useBudget, getCategoryMeta } from "../context/BudgetContext.jsx";
 import { formatCurrency } from "../utils/formatters.js";
 import { CategoryIcon, EditIcon, TrashIcon, SearchIcon, CheckIcon } from "./Icons.jsx";
@@ -172,85 +172,170 @@ export default function BudgetTable({ onEditCategory }) {
               const percentNum = getPercentNum(cat.budgeted);
 
               return (
-                <tr key={cat.id} className="table-row" id={`row-${cat.id}`}>
-                  <td>
-                    <div className="category-cell-content">
-                      <div
-                        className="cat-icon-container"
-                        style={{ backgroundColor: meta.bgColor, color: meta.color }}
-                      >
-                        <CategoryIcon name={meta.icon} size={18} />
-                      </div>
-                      <div className="cat-text-container">
-                        <div className="cat-name-wrapper">
-                          {hasChildren && (
-                            <button
-                              className={`collapse-toggle-btn ${cat.expanded ? "expanded" : ""}`}
-                              onClick={() => handleToggle(cat.id)}
-                              type="button"
-                              title={cat.expanded ? "Contraer subcategorías" : "Expandir subcategorías"}
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
-                                <polyline points="9 18 15 12 9 6" />
-                              </svg>
-                            </button>
-                          )}
-                          <span className="cat-main-name">{cat.name}</span>
-                        </div>
-                        <span className="cat-subtext-desc">{meta.subtext}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`type-badge ${meta.badgeCls}`}>{meta.type}</span>
-                  </td>
-                  <td className="cell-budgeted">
-                    <strong>{formatCurrency(cat.budgeted)}</strong>
-                  </td>
-                  <td>
-                    <div className="proportion-cell">
-                      <div className="bar-track">
+                <Fragment key={cat.id}>
+                  <tr className={`table-row parent-row ${hasChildren ? "has-children" : ""}`} id={`row-${cat.id}`}>
+                    <td>
+                      <div className="category-cell-content">
                         <div
-                          className="bar-fill"
-                          style={{
-                            width: `${percentNum}%`,
-                            backgroundColor: meta.color,
-                          }}
-                        />
+                          className="cat-icon-container"
+                          style={{ backgroundColor: meta.bgColor, color: meta.color }}
+                        >
+                          <CategoryIcon name={meta.icon} size={18} />
+                        </div>
+                        <div className="cat-text-container">
+                          <div className="cat-name-wrapper">
+                            {hasChildren && (
+                              <button
+                                className={`collapse-toggle-btn ${cat.expanded ? "expanded" : ""}`}
+                                onClick={() => handleToggle(cat.id)}
+                                type="button"
+                                title={cat.expanded ? "Contraer subcategorías" : "Desplegar subcategorías"}
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+                                  <polyline points={cat.expanded ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+                                </svg>
+                              </button>
+                            )}
+                            <span
+                              className={`cat-main-name ${hasChildren ? "clickable-parent-name" : ""}`}
+                              onClick={hasChildren ? () => handleToggle(cat.id) : undefined}
+                            >
+                              {cat.name}
+                            </span>
+                          </div>
+                          <span className="cat-subtext-desc">{meta.subtext}</span>
+                        </div>
                       </div>
-                      <span className="proportion-text">{percentStr}</span>
-                    </div>
-                  </td>
-                  <td className="cell-difference">
-                    {diffData.display === "-" ? (
-                      <span className="diff-dash">-</span>
-                    ) : (
-                      <span className={`diff-pill-badge ${diffData.isZero ? "diff-zero" : "diff-warn"}`}>
-                        {diffData.display}
-                      </span>
-                    )}
-                  </td>
-                  <td className="cell-actions">
-                    <button
-                      className="action-btn-icon edit"
-                      onClick={() => onEditCategory(cat)}
-                      title="Editar categoría"
-                      type="button"
-                    >
-                      <EditIcon size={15} />
-                    </button>
-                    {cat.canDelete && (
+                    </td>
+                    <td>
+                      <span className={`type-badge ${meta.badgeCls}`}>{meta.type}</span>
+                    </td>
+                    <td className="cell-budgeted">
+                      <strong>{formatCurrency(cat.budgeted)}</strong>
+                    </td>
+                    <td>
+                      <div className="proportion-cell">
+                        <div className="bar-track">
+                          <div
+                            className="bar-fill"
+                            style={{
+                              width: `${percentNum}%`,
+                              backgroundColor: meta.color,
+                            }}
+                          />
+                        </div>
+                        <span className="proportion-text">{percentStr}</span>
+                      </div>
+                    </td>
+                    <td className="cell-difference">
+                      {diffData.display === "-" ? (
+                        <span className="diff-dash">-</span>
+                      ) : (
+                        <span className={`diff-pill-badge ${diffData.isZero ? "diff-zero" : "diff-warn"}`}>
+                          {diffData.display}
+                        </span>
+                      )}
+                    </td>
+                    <td className="cell-actions">
                       <button
-                        className="action-btn-icon delete"
-                        onClick={() => handleDelete(cat.id, cat.name)}
-                        title="Eliminar categoría"
+                        className="action-btn-icon edit"
+                        onClick={() => onEditCategory(cat)}
+                        title="Editar categoría"
                         type="button"
                       >
-                        <TrashIcon size={15} />
+                        <EditIcon size={15} />
                       </button>
-                    )}
-                  </td>
-                </tr>
+                      {cat.canDelete && (
+                        <button
+                          className="action-btn-icon delete"
+                          onClick={() => handleDelete(cat.id, cat.name)}
+                          title="Eliminar categoría"
+                          type="button"
+                        >
+                          <TrashIcon size={15} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+
+                  {/* Subcategorías desplegadas: SIN ICONOS, con sangría limpia */}
+                  {cat.expanded &&
+                    children.map((child) => {
+                      const childPercentStr = getPercent(child.budgeted);
+                      const childPercentNum = getPercentNum(child.budgeted);
+
+                      return (
+                        <tr
+                          key={child.id}
+                          className="table-row subcategory-row"
+                          id={`row-${child.id}`}
+                        >
+                          <td>
+                            <div className="category-cell-content subcat-cell-content">
+                              {/* Espaciador de sangría: sin icono */}
+                              <div className="subcat-indent-space" />
+                              <div className="cat-text-container">
+                                <span className="subcat-main-name">{child.name}</span>
+                                {child.subtext && (
+                                  <span className="cat-subtext-desc">{child.subtext}</span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="type-badge badge-subcat">
+                              {child.type || "Subcategoría"}
+                            </span>
+                          </td>
+                          <td className="cell-budgeted">
+                            <span className="subcat-budgeted-amount">
+                              {formatCurrency(child.budgeted)}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="proportion-cell">
+                              <div className="bar-track subcat-track">
+                                <div
+                                  className="bar-fill"
+                                  style={{
+                                    width: `${childPercentNum}%`,
+                                    backgroundColor: meta.color,
+                                    opacity: 0.8,
+                                  }}
+                                />
+                              </div>
+                              <span className="proportion-text subcat-pct">
+                                {childPercentStr}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="cell-difference">
+                            <span className="diff-dash">-</span>
+                          </td>
+                          <td className="cell-actions">
+                            <button
+                              className="action-btn-icon edit"
+                              onClick={() => onEditCategory(child)}
+                              title="Editar subcategoría"
+                              type="button"
+                            >
+                              <EditIcon size={14} />
+                            </button>
+                            {child.canDelete !== false && (
+                              <button
+                                className="action-btn-icon delete"
+                                onClick={() => handleDelete(child.id, child.name)}
+                                title="Eliminar subcategoría"
+                                type="button"
+                              >
+                                <TrashIcon size={14} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </Fragment>
               );
             })}
           </tbody>

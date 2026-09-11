@@ -123,10 +123,14 @@ function budgetReducer(state, action) {
         canDelete: action.payload.canDelete !== false,
         expanded: false,
         type: action.payload.type || "Gasto Fijo",
-        subtext: action.payload.subtext || "Asignación presupuestaria mensual",
-        icon: action.payload.icon || "default"
+        subtext: action.payload.subtext || "",
+        icon: action.payload.parentId ? null : (action.payload.icon || "default")
       };
-      return { ...state, categories: [...state.categories, newCat] };
+      const updatedCategories = action.payload.parentId
+        ? state.categories.map((c) => c.id === action.payload.parentId ? { ...c, expanded: true } : c)
+        : state.categories;
+
+      return { ...state, categories: [...updatedCategories, newCat] };
     }
     case "UPDATE_CATEGORY": {
       return {

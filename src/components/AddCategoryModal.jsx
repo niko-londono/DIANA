@@ -172,20 +172,6 @@ export default function AddCategoryModal({ isOpen, onClose, categoryToEdit = nul
 
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="cat-icon">Ícono</label>
-                <select
-                  id="cat-icon"
-                  className="form-input"
-                  value={icon}
-                  onChange={(e) => setIcon(e.target.value)}
-                >
-                  {ICONS.map((ic) => (
-                    <option key={ic.id} value={ic.id}>{ic.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
                 <label htmlFor="cat-parent">Categoría Padre (Opcional)</label>
                 <select
                   id="cat-parent"
@@ -193,7 +179,7 @@ export default function AddCategoryModal({ isOpen, onClose, categoryToEdit = nul
                   value={parentId}
                   onChange={(e) => setParentId(e.target.value)}
                 >
-                  <option value="">Ninguna (Nivel Superior)</option>
+                  <option value="">Ninguna (Categoría Principal)</option>
                   {parentOptions.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
@@ -201,6 +187,22 @@ export default function AddCategoryModal({ isOpen, onClose, categoryToEdit = nul
                   ))}
                 </select>
               </div>
+
+              {!parentId && (
+                <div className="form-group">
+                  <label htmlFor="cat-icon">Ícono</label>
+                  <select
+                    id="cat-icon"
+                    className="form-input"
+                    value={icon}
+                    onChange={(e) => setIcon(e.target.value)}
+                  >
+                    {ICONS.map((ic) => (
+                      <option key={ic.id} value={ic.id}>{ic.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
