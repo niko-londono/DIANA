@@ -54,15 +54,18 @@ export default function BudgetHero({ onNewCategory }) {
           {isBalanced ? (
             <span className="balance-pill-badge balanced">
               <CheckIcon size={12} />
-              <span>Presupuesto Balanceado (Cuadrado a Cero)</span>
+              <span className="badge-text-full">Presupuesto Balanceado (Cuadrado a Cero)</span>
+              <span className="badge-text-short">Balance Cero ($0.00)</span>
             </span>
           ) : remainingBalance > 0 ? (
             <span className="balance-pill-badge surplus">
-              <span>Superávit disponible: {formatCurrency(remainingBalance)}</span>
+              <span className="badge-text-full">Superávit disponible: {formatCurrency(remainingBalance)}</span>
+              <span className="badge-text-short">Superávit: {formatCurrency(remainingBalance)}</span>
             </span>
           ) : (
             <span className="balance-pill-badge deficit">
-              <span>Déficit: {formatCurrency(remainingBalance)}</span>
+              <span className="badge-text-full">Déficit: {formatCurrency(remainingBalance)}</span>
+              <span className="badge-text-short">Déficit: {formatCurrency(remainingBalance)}</span>
             </span>
           )}
         </div>

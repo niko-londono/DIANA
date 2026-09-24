@@ -47,7 +47,22 @@ export default function Header() {
             id="month-selector-btn"
             type="button"
           >
-            <span>{selectedMonth}</span>
+            <span className="month-text-full">{selectedMonth}</span>
+            <span className="month-text-short">
+              {selectedMonth
+                .replace("Enero", "Ene")
+                .replace("Febrero", "Feb")
+                .replace("Marzo", "Mar")
+                .replace("Abril", "Abr")
+                .replace("Mayo", "May")
+                .replace("Junio", "Jun")
+                .replace("Julio", "Jul")
+                .replace("Agosto", "Ago")
+                .replace("Septiembre", "Sep")
+                .replace("Octubre", "Oct")
+                .replace("Noviembre", "Nov")
+                .replace("Diciembre", "Dic")}
+            </span>
             <ChevronDownIcon size={14} className={`dropdown-arrow ${isDropdownOpen ? "open" : ""}`} />
           </button>
 

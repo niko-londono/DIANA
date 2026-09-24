@@ -87,3 +87,53 @@
   border-top-right-radius: 9999px;
   border-bottom-right-radius: 9999px;
 }
+
+/* ═══════════════════════════════════════════════════
+   Mobile Responsive Allocation Bar
+   ═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .allocation-card {
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+  }
+
+  .allocation-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .allocation-title-group {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .allocation-title {
+    font-size: 0.8125rem;
+  }
+
+  .allocation-subtitle {
+    font-size: 0.72rem;
+  }
+
+  .allocation-legends {
+    gap: 0.35rem 0.65rem;
+  }
+
+  .legend-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .legend-text {
+    font-size: 0.7rem;
+  }
+
+  .multi-progress-bar {
+    height: 8px;
+    padding: 1.5px;
+    gap: 1.5px;
+  }
+}

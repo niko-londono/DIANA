@@ -108,10 +108,10 @@ export default function BudgetTable({ onEditCategory }) {
           <thead>
             <tr>
               <th className="th-category">CATEGORÍA</th>
-              <th className="th-type">TIPO</th>
+              <th className="th-type col-desktop-only">TIPO</th>
               <th className="th-budgeted">PRESUPUESTADO</th>
-              <th className="th-proportion">PROPORCIÓN (% SUELDO)</th>
-              <th className="th-difference">DIFERENCIA</th>
+              <th className="th-proportion col-desktop-only">PROPORCIÓN (% SUELDO)</th>
+              <th className="th-difference col-desktop-only">DIFERENCIA</th>
               <th className="th-actions">ACCIONES</th>
             </tr>
           </thead>
@@ -127,16 +127,25 @@ export default function BudgetTable({ onEditCategory }) {
                     <div className="cat-text-container">
                       <span className="cat-main-name">{sueldoCat.name}</span>
                       <span className="cat-subtext-desc">{sueldoCat.subtext || "Ingreso recurrente de nómina"}</span>
+                      <div className="cat-mobile-meta">
+                        <span className="type-badge badge-income">Ingreso Base</span>
+                        <span className="cat-mobile-pct">100%</span>
+                      </div>
                     </div>
                   </div>
                 </td>
-                <td>
+                <td className="col-desktop-only">
                   <span className="type-badge badge-income">Ingreso Base</span>
                 </td>
                 <td className="cell-budgeted">
-                  <strong>{formatCurrency(sueldoCat.budgeted)}</strong>
+                  <div className="budgeted-cell-inner">
+                    <strong>{formatCurrency(sueldoCat.budgeted)}</strong>
+                    <span className="diff-pill-badge diff-zero diff-pill-mobile">
+                      <CheckIcon size={10} /> $0.00
+                    </span>
+                  </div>
                 </td>
-                <td>
+                <td className="col-desktop-only">
                   <div className="proportion-cell">
                     <div className="bar-track">
                       <div className="bar-fill fill-emerald" style={{ width: "100%" }} />
@@ -144,7 +153,7 @@ export default function BudgetTable({ onEditCategory }) {
                     <span className="proportion-text">100%</span>
                   </div>
                 </td>
-                <td className="cell-difference">
+                <td className="cell-difference col-desktop-only">
                   <span className="diff-pill-badge diff-zero">
                     <CheckIcon size={12} /> $0.00
                   </span>
@@ -204,16 +213,27 @@ export default function BudgetTable({ onEditCategory }) {
                             </span>
                           </div>
                           <span className="cat-subtext-desc">{meta.subtext}</span>
+                          <div className="cat-mobile-meta">
+                            <span className={`type-badge ${meta.badgeCls}`}>{meta.type}</span>
+                            <span className="cat-mobile-pct">{percentStr}</span>
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td className="col-desktop-only">
                       <span className={`type-badge ${meta.badgeCls}`}>{meta.type}</span>
                     </td>
                     <td className="cell-budgeted">
-                      <strong>{formatCurrency(cat.budgeted)}</strong>
+                      <div className="budgeted-cell-inner">
+                        <strong>{formatCurrency(cat.budgeted)}</strong>
+                        {diffData.display !== "-" && (
+                          <span className={`diff-pill-badge diff-pill-mobile ${diffData.isZero ? "diff-zero" : "diff-warn"}`}>
+                            {diffData.display}
+                          </span>
+                        )}
+                      </div>
                     </td>
-                    <td>
+                    <td className="col-desktop-only">
                       <div className="proportion-cell">
                         <div className="bar-track">
                           <div
@@ -227,7 +247,7 @@ export default function BudgetTable({ onEditCategory }) {
                         <span className="proportion-text">{percentStr}</span>
                       </div>
                     </td>
-                    <td className="cell-difference">
+                    <td className="cell-difference col-desktop-only">
                       {diffData.display === "-" ? (
                         <span className="diff-dash">-</span>
                       ) : (
@@ -279,20 +299,28 @@ export default function BudgetTable({ onEditCategory }) {
                                 {child.subtext && (
                                   <span className="cat-subtext-desc">{child.subtext}</span>
                                 )}
+                                <div className="cat-mobile-meta">
+                                  <span className="type-badge badge-subcat">
+                                    {child.type || "Subcategoría"}
+                                  </span>
+                                  <span className="cat-mobile-pct">{childPercentStr}</span>
+                                </div>
                               </div>
                             </div>
                           </td>
-                          <td>
+                          <td className="col-desktop-only">
                             <span className="type-badge badge-subcat">
                               {child.type || "Subcategoría"}
                             </span>
                           </td>
                           <td className="cell-budgeted">
-                            <span className="subcat-budgeted-amount">
-                              {formatCurrency(child.budgeted)}
-                            </span>
+                            <div className="budgeted-cell-inner">
+                              <span className="subcat-budgeted-amount">
+                                {formatCurrency(child.budgeted)}
+                              </span>
+                            </div>
                           </td>
-                          <td>
+                          <td className="col-desktop-only">
                             <div className="proportion-cell">
                               <div className="bar-track subcat-track">
                                 <div
@@ -309,7 +337,7 @@ export default function BudgetTable({ onEditCategory }) {
                               </span>
                             </div>
                           </td>
-                          <td className="cell-difference">
+                          <td className="cell-difference col-desktop-only">
                             <span className="diff-dash">-</span>
                           </td>
                           <td className="cell-actions">
@@ -351,10 +379,15 @@ export default function BudgetTable({ onEditCategory }) {
                     <span className="summary-sub-desc">
                       Balance exacto presupuestado vs ingreso total
                     </span>
+                    <div className="summary-mobile-badges">
+                      <span className="cuadre-badge-pill">
+                        Cuadre Total {totalIncome > 0 ? ((totalExpenses / totalIncome) * 100).toFixed(0) : 100}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               </td>
-              <td>
+              <td className="col-desktop-only">
                 <span className="cuadre-badge-pill">
                   Cuadre Total {totalIncome > 0 ? ((totalExpenses / totalIncome) * 100).toFixed(0) : 100}%
                 </span>
@@ -363,9 +396,14 @@ export default function BudgetTable({ onEditCategory }) {
                 <div className="summary-col-budgeted">
                   <span className="summary-total-amount">{formatCurrency(totalExpenses)}</span>
                   <span className="summary-total-label">Total asignado</span>
+                  <div className="summary-mobile-diff">
+                    <span className="diff-balance-badge">
+                      {isBalanced ? "BALANCE CERO" : remainingBalance > 0 ? "SUPERÁVIT" : "DÉFICIT"}
+                    </span>
+                  </div>
                 </div>
               </td>
-              <td>
+              <td className="col-desktop-only">
                 <div className="proportion-cell">
                   <div className="bar-track dark-track">
                     <div className="bar-fill fill-emerald" style={{ width: "100%" }} />
@@ -373,7 +411,7 @@ export default function BudgetTable({ onEditCategory }) {
                   <span className="proportion-text text-white">100%</span>
                 </div>
               </td>
-              <td className="cell-difference">
+              <td className="cell-difference col-desktop-only">
                 <div className="summary-col-diff">
                   <span className="diff-zero-amount">
                     {formatCurrency(remainingBalance)}

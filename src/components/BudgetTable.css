@@ -536,3 +536,295 @@
 .footer-rules-link:hover {
   color: #0f172a;
 }
+
+/* ═══════════════════════════════════════════════════
+   Desktop & Mobile Responsive Rules for BudgetTable
+   ═══════════════════════════════════════════════════ */
+.col-desktop-only {
+  display: table-cell;
+}
+
+.cat-mobile-meta {
+  display: none;
+}
+
+.diff-pill-mobile {
+  display: none;
+}
+
+.summary-mobile-badges {
+  display: none;
+}
+
+.summary-mobile-diff {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .budget-table-card {
+    border-radius: 14px;
+    margin-bottom: 1.5rem;
+  }
+
+  .table-card-header {
+    padding: 1rem 0.85rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .table-card-title {
+    font-size: 1rem;
+  }
+
+  .table-card-subtitle {
+    font-size: 0.75rem;
+  }
+
+  .table-search-box {
+    width: 100%;
+  }
+
+  .table-search-input {
+    width: 100% !important;
+    padding: 0.5rem 0.85rem 0.5rem 2.25rem;
+  }
+
+  /* No horizontal scrollbar on mobile */
+  .table-responsive {
+    overflow-x: hidden;
+  }
+
+  .categories-table {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .col-desktop-only {
+    display: none !important;
+  }
+
+  .categories-table th {
+    padding: 0.65rem 0.5rem;
+    font-size: 0.62rem;
+  }
+
+  .th-category {
+    width: 52%;
+  }
+
+  .th-budgeted {
+    width: 32%;
+    text-align: right;
+  }
+
+  .th-actions {
+    width: 16%;
+    text-align: right;
+  }
+
+  .categories-table td {
+    padding: 0.65rem 0.5rem;
+  }
+
+  .category-cell-content {
+    gap: 0.45rem;
+  }
+
+  .cat-icon-container {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    flex-shrink: 0;
+  }
+
+  .cat-icon-container svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .cat-name-wrapper {
+    gap: 0.3rem;
+  }
+
+  .collapse-toggle-btn {
+    width: 18px;
+    height: 18px;
+  }
+
+  .cat-main-name {
+    font-size: 0.82rem;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .cat-subtext-desc {
+    font-size: 0.66rem;
+    line-height: 1.25;
+  }
+
+  .cat-mobile-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.2rem;
+    flex-wrap: wrap;
+  }
+
+  .cat-mobile-meta .type-badge {
+    font-size: 0.6rem;
+    padding: 0.12rem 0.35rem;
+    border-radius: 4px;
+  }
+
+  .cat-mobile-pct {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #475569;
+  }
+
+  .cell-budgeted {
+    text-align: right;
+    padding-right: 0.4rem;
+  }
+
+  .budgeted-cell-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+  }
+
+  .budgeted-cell-inner strong {
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .diff-pill-mobile {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.62rem;
+    padding: 0.12rem 0.35rem;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .cell-actions {
+    text-align: right;
+    padding-right: 0.4rem;
+    white-space: nowrap;
+  }
+
+  .action-btn-icon {
+    padding: 0.3rem;
+  }
+
+  /* Subcategories on mobile */
+  .subcat-cell-content {
+    gap: 0.35rem;
+  }
+
+  .subcat-indent-space {
+    width: 16px;
+    height: 20px;
+  }
+
+  .subcat-indent-space::after {
+    font-size: 0.95rem;
+  }
+
+  .subcat-main-name {
+    font-size: 0.75rem;
+  }
+
+  .subcat-budgeted-amount {
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  /* Dark Summary Row on mobile */
+  .summary-dark-row td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .summary-col-category {
+    gap: 0.45rem;
+  }
+
+  .summary-check-box {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+  }
+
+  .summary-check-box svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .summary-main-title {
+    font-size: 0.82rem;
+  }
+
+  .summary-sub-desc {
+    display: none;
+  }
+
+  .summary-mobile-badges {
+    display: block;
+    margin-top: 0.2rem;
+  }
+
+  .summary-mobile-badges .cuadre-badge-pill {
+    font-size: 0.6rem;
+    padding: 0.12rem 0.4rem;
+  }
+
+  .summary-col-budgeted {
+    align-items: flex-end;
+  }
+
+  .summary-total-amount {
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .summary-total-label {
+    font-size: 0.58rem;
+  }
+
+  .summary-mobile-diff {
+    display: block;
+    margin-top: 0.15rem;
+  }
+
+  .summary-mobile-diff .diff-balance-badge {
+    font-size: 0.58rem;
+    padding: 0.1rem 0.3rem;
+  }
+
+  .cuadre-ready-text {
+    font-size: 0.68rem;
+    gap: 0.2rem;
+  }
+
+  /* Footer bar on mobile */
+  .table-footer-bar {
+    padding: 0.75rem 0.85rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+    font-size: 0.68rem;
+  }
+
+  .footer-left-note {
+    font-size: 0.66rem;
+    line-height: 1.35;
+  }
+
+  .footer-right-info {
+    font-size: 0.66rem;
+    gap: 0.35rem;
+  }
+}

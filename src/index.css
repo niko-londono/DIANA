@@ -158,6 +158,7 @@ html, body, #root {
 /* ── Mobile Responsive ── */
 @media (max-width: 768px) {
   .main-scroll {
-    padding: 1.25rem 1rem;
+    padding: 0.65rem 0.65rem 2.5rem 0.65rem;
+    -webkit-overflow-scrolling: touch;
   }
 }
