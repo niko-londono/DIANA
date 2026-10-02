@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.jsx";
-import "./index.css";
+import App from "./diana-master.jsx";
+import "./diana-master.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
