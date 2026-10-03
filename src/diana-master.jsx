@@ -23,6 +23,7 @@ import {
   BudgetProvider,
   getCategoryMeta,
   getCategoryDiff,
+  isIncomeCategory,
   formatCurrency,
   getPercent,
   getPercentNum,
@@ -641,25 +642,29 @@ export function MetricCards() {
   };
 
   const expenseCategories = categories.filter(
-    (c) => c.parentId === null && c.id !== "sueldo"
+    (c) => c.parentId === null && !isIncomeCategory(c)
   );
 
   const displayExpenses = expenseCategories.slice(0, 3);
+
+  // Si hay ingresos extra (categorías tipo "Ingreso Base"), la tarjeta muestra el ingreso total
+  const hasExtraIncome = categories.some((c) => isIncomeCategory(c) && c.id !== "sueldo");
+  const incomeAmount = totalIncome || sueldoCat.budgeted;
 
   return (
     <div className="metric-cards-grid" id="metric-cards">
       {/* Tarjeta 1: Ingreso Base */}
       <div className="metric-card card-income" id="metric-card-income">
         <div className="card-top-row">
-          <span className="card-label">INGRESO BASE (SUELDO)</span>
+          <span className="card-label">{hasExtraIncome ? "INGRESO TOTAL (SUELDO + EXTRAS)" : "INGRESO BASE (SUELDO)"}</span>
           <div className="card-icon-box bg-emerald-light text-emerald">
             <CategoryIcon name="cash" size={18} />
           </div>
         </div>
-        <div className="card-amount">{formatCurrency(sueldoCat.budgeted)}</div>
+        <div className="card-amount">{formatCurrency(incomeAmount)}</div>
         <div className="card-subtext">
           <strong className="highlight-emerald">100%</strong>
-          <span>Total disponible mensual</span>
+          <span>{hasExtraIncome ? "Sueldo + ingresos extra" : "Total disponible mensual"}</span>
         </div>
       </div>
 
@@ -712,7 +717,7 @@ export function AllocationBar() {
   const { categories, totalIncome, totalExpenses } = useBudget();
 
   const expenseCategories = categories.filter(
-    (c) => c.parentId === null && c.id !== "sueldo"
+    (c) => c.parentId === null && !isIncomeCategory(c)
   );
 
   const totalAllocatedPercent = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
@@ -777,8 +782,12 @@ export function BudgetTable({ onEditCategory }) {
   const { categories, totalIncome, totalExpenses, remainingBalance, isBalanced, dispatch } = useBudget();
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Categorías de ingreso (tipo "Ingreso Base") primero, justo debajo del Sueldo; luego los gastos
   const parentCategories = useMemo(
-    () => categories.filter((c) => c.parentId === null && c.id !== "sueldo"),
+    () =>
+      categories
+        .filter((c) => c.parentId === null && c.id !== "sueldo")
+        .sort((a, b) => Number(isIncomeCategory(b)) - Number(isIncomeCategory(a))),
     [categories]
   );
 
@@ -802,6 +811,9 @@ export function BudgetTable({ onEditCategory }) {
     subtext: "Ingreso recurrente de nómina",
     icon: "cash",
   };
+
+  const sueldoPctNum = totalIncome > 0 ? getPercentNum(sueldoCat.budgeted, totalIncome) : 100;
+  const sueldoPercentStr = `${Number.isInteger(sueldoPctNum) ? sueldoPctNum : sueldoPctNum.toFixed(1)}%`;
 
   const filteredParents = useMemo(() => {
     if (!searchQuery.trim()) return parentCategories;
@@ -848,7 +860,7 @@ export function BudgetTable({ onEditCategory }) {
               <th className="th-category">CATEGORÍA</th>
               <th className="th-type col-desktop-only">TIPO</th>
               <th className="th-budgeted">PRESUPUESTADO</th>
-              <th className="th-proportion col-desktop-only">PROPORCIÓN (% SUELDO)</th>
+              <th className="th-proportion col-desktop-only">PROPORCIÓN (% INGRESO)</th>
               <th className="th-difference col-desktop-only">DIFERENCIA</th>
               <th className="th-actions">ACCIONES</th>
             </tr>
@@ -891,7 +903,7 @@ export function BudgetTable({ onEditCategory }) {
                           <span className="cat-subtext-desc">{sueldoCat.subtext || "Ingreso recurrente de nómina"}</span>
                           <div className="cat-mobile-meta">
                             <span className="type-badge badge-income">Ingreso Base</span>
-                            <span className="cat-mobile-pct">100%</span>
+                            <span className="cat-mobile-pct">{sueldoPercentStr}</span>
                           </div>
                         </div>
                       </div>
@@ -916,9 +928,9 @@ export function BudgetTable({ onEditCategory }) {
                     <td className="col-desktop-only">
                       <div className="proportion-cell">
                         <div className="bar-track">
-                          <div className="bar-fill fill-emerald" style={{ width: "100%" }} />
+                          <div className="bar-fill fill-emerald" style={{ width: `${sueldoPctNum}%` }} />
                         </div>
-                        <span className="proportion-text">100%</span>
+                        <span className="proportion-text">{sueldoPercentStr}</span>
                       </div>
                     </td>
                     <td className="cell-difference col-desktop-only">

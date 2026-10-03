@@ -205,6 +205,17 @@ export function getPercentNum(amount, total) {
 // 3. METADATOS Y CLASIFICACIÓN DE CATEGORÍAS
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * ¿Esta categoría suma al ingreso? (en vez de contarse como gasto)
+ * Aplica solo a categorías principales: el Sueldo y cualquier categoría con tipo "Ingreso Base".
+ * Las subcategorías nunca suman (son organizativas dentro de su categoría padre).
+ */
+export function isIncomeCategory(cat) {
+  if (!cat || cat.parentId) return false;
+  if (cat.id === "sueldo") return true;
+  return String(cat.type || "").toLowerCase().includes("ingreso");
+}
+
 export function getCategoryMeta(cat) {
   if (!cat) {
     return {
@@ -217,10 +228,13 @@ export function getCategoryMeta(cat) {
     };
   }
 
-  if (cat.id === "sueldo" || (cat.name && cat.name.toLowerCase().includes("sueldo"))) {
+  const isSueldo = cat.id === "sueldo" || (cat.name && cat.name.toLowerCase().includes("sueldo"));
+  const isIncomeType = String(cat.type || "").toLowerCase().includes("ingreso");
+
+  if (isSueldo || isIncomeType) {
     return {
       type: cat.type || "Ingreso Base",
-      subtext: cat.subtext || "Ingreso recurrente de nómina",
+      subtext: cat.subtext || (isSueldo ? "Ingreso recurrente de nómina" : "Ingreso adicional que se suma al sueldo"),
       icon: cat.icon || "cash",
       badgeCls: "badge-income",
       color: "#10b981",
@@ -295,7 +309,7 @@ export function getCategoryDiff(parent, allCategories) {
 
 export function exportBudgetToCSV(categories, totalIncome, totalExpenses, remainingBalance, monthKey) {
   const rows = [
-    ["Categoría", "Tipo", "Presupuestado", "Proporción (% Sueldo)", "Diferencia"],
+    ["Categoría", "Tipo", "Presupuestado", "Proporción (% Ingreso)", "Diferencia"],
   ];
 
   categories.forEach((c) => {
@@ -780,13 +794,15 @@ export function BudgetProvider({ children }) {
     [state.byMonth]
   );
 
+  // Ingreso total = Sueldo + categorías principales de tipo "Ingreso Base" (ingresos extra)
   const totalIncome = categories
-    .filter((c) => c.id === "sueldo")
+    .filter(isIncomeCategory)
     .reduce((sum, c) => sum + (Number(c.budgeted) || 0), 0);
 
-  // Solo sumar categorías top-level (no subcategorías) para evitar doble conteo
+  // Solo sumar categorías top-level (no subcategorías) para evitar doble conteo,
+  // y sin incluir las que son ingresos
   const totalExpenses = categories
-    .filter((c) => c.id !== "sueldo" && c.parentId === null)
+    .filter((c) => !c.parentId && !isIncomeCategory(c))
     .reduce((sum, c) => sum + (Number(c.budgeted) || 0), 0);
 
   const remainingBalance = totalIncome - totalExpenses;

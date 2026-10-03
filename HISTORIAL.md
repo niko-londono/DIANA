@@ -53,12 +53,14 @@ src/
 ## 📊 3. Reglas de Negocio y Metodología Presupuestaria
 
 - **Metodología Base Cero**:  
-  $$\text{Sueldo Base} - \text{Total Asignado (Gastos)} = \text{Diferencia ($0.00)}$$
+  $$\text{Ingresos (Sueldo + Ingresos Extra)} - \text{Total Asignado (Gastos)} = \text{Diferencia ($0.00)}$$
 - **Presupuesto Independiente por Mes**:
   El estado es `byMonth = { "2026-10": [...], "2026-11": [...] }`. Todo lo que se edita, crea, elimina o restablece afecta únicamente al mes seleccionado. Al abrir un mes por primera vez (`ENSURE_MONTH`) se crea como **copia independiente** del mes anterior más cercano con datos (si no hay, del siguiente; si no, de `DEFAULT_CATEGORIES`). Después de creado ya no se sincroniza con ningún otro mes.
+- **Ingresos Extra (categorías tipo "Ingreso Base")**:
+  Una categoría principal (`parentId: null`) con tipo **Ingreso Base** se **suma** al ingreso total en lugar de contarse como gasto (función `isIncomeCategory` en `diana-master.js`). `totalIncome` = Sueldo + esas categorías; `totalExpenses` excluye a todas ellas. Las subcategorías nunca suman. El porcentaje de cada fila se calcula sobre el ingreso total.
 - **Prevención de Doble Conteo**:  
   Las categorías principales tienen `parentId: null`. Las subcategorías tienen `parentId: <id_padre>`.  
-  El cálculo de gastos totales (`totalExpenses`) únicamente suma categorías donde `parentId === null && id !== "sueldo"`.
+  El cálculo de gastos totales (`totalExpenses`) únicamente suma categorías principales que no son ingreso (`!parentId && !isIncomeCategory`).
 - **Diferencia en Categorías con Hijos**:  
   Para una categoría padre con subcategorías:  
   $$\text{Diferencia} = \text{Presupuesto(Padre)} - \sum \text{Presupuesto(Hijos)}$$  
@@ -90,6 +92,13 @@ src/
 ---
 
 ## 📝 5. Historial de Cambios y Actualizaciones
+
+### [v1.9.0] — 2026-10-03 (Ingresos Extra suman al Ingreso)
+- **Lógica** (`diana-master.js`): nueva función `isIncomeCategory`. `totalIncome` ahora suma el Sueldo y toda categoría principal de tipo "Ingreso Base"; `totalExpenses` las excluye. `getCategoryMeta` trata el tipo "Ingreso Base" con estilo de ingreso (badge verde, ícono de efectivo, descripción "Ingreso adicional que se suma al sueldo").
+- **Tarjetas** (`diana-master.jsx`): la primera tarjeta muestra el ingreso total ("INGRESO TOTAL (SUELDO + EXTRAS)") cuando existen ingresos extra; sin extras queda igual que antes. Las tarjetas de gasto y la barra de Distribución ya no incluyen categorías de ingreso.
+- **Tabla**: las categorías de ingreso se listan justo debajo del Sueldo y antes de los gastos. La fila del Sueldo muestra su porcentaje real del ingreso total (100% si no hay extras). Encabezado renombrado a "PROPORCIÓN (% INGRESO)" (igual en el CSV).
+- **Efecto en el balance**: ejemplo Sueldo $17,000 + Ingresos Extra $1,000 contra gastos de $17,000 → ya no es déficit; queda superávit de $1,000 por asignar.
+- Pruebas de lógica y UI verificadas (incluye caso con y sin ingresos extra).
 
 ### [v1.8.0] — 2026-10-03 (Calendario de Mes/Año y Presupuesto por Mes)
 - **Selector de mes** (`diana-master.jsx`): el dropdown con lista fija de meses 2024/2025 fue reemplazado por el componente `MonthPicker`: calendario de solo meses y años (sin días), navegación de año con flechas (2020–2100), mes seleccionado resaltado, borde en el mes actual, punto en los meses que ya tienen presupuesto y botón "Mes actual". Nuevos iconos `ChevronLeftIcon`, `ChevronRightIcon` y `CalendarIcon`.
