@@ -62,7 +62,7 @@ export const METRIC_CARD_THEMES = [
 
 export const NAV_ITEMS = [
   { id: "overview", label: "Overview", iconType: "grid" },
-  { id: "summary", label: "Summary", iconType: "list" },
+  { id: "proyeccion", label: "Proyección", iconType: "trending" },
   { id: "distribution", label: "Distribución", iconType: "pie" },
   { id: "cards", label: "Tarjetas", iconType: "card" },
   { id: "settings", label: "Settings", iconType: "settings" },
@@ -280,6 +280,162 @@ export function exportBudgetToCSV(categories, totalIncome, totalExpenses, remain
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. PROYECCIÓN Y CALCULADORA DE METAS DE AHORRO
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const GOAL_STORAGE_KEY = "finanzas_meta_ahorro";
+
+export const DEFAULT_GOAL = {
+  goalName: "Meta de ahorro",
+  targetAmount: 90000,
+  currentSavings: 10000,
+  termMonths: 6,
+  startDate: "2026-09-29",
+  annualRate: 0,
+};
+
+/**
+ * Suma meses a una fecha respetando el día del mes o ajustando al último día válido
+ */
+export function addMonthsSafe(baseDate, monthsToAdd) {
+  const d = new Date(baseDate.getTime());
+  const targetDay = baseDate.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + monthsToAdd);
+  const maxDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(targetDay, maxDays));
+  return d;
+}
+
+/**
+ * Formatea un objeto Date a "DD/MM/YYYY"
+ */
+export function formatDateDDMMYYYY(date) {
+  if (!date || isNaN(date.getTime())) return "-";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * Convierte un string "YYYY-MM-DD" a Date de forma segura sin desajuste de zona horaria local
+ */
+export function parseISODate(isoStr) {
+  if (!isoStr) return new Date();
+  const parts = String(isoStr).split("-").map(Number);
+  if (parts.length === 3) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date(isoStr);
+}
+
+/**
+ * Calcula todas las métricas de proyección de ahorro, compatibilidad presupuestaria y cronograma mes a mes
+ */
+export function calculateGoalProjection({
+  goalName = "Meta de ahorro",
+  targetAmount = 90000,
+  currentSavings = 10000,
+  termMonths = 6,
+  startDate = "2026-09-29",
+  annualRate = 0,
+  budgetedSavings = 1000,
+  totalIncome = 17000
+}) {
+  const target = Math.max(0, Number(targetAmount) || 0);
+  const current = Math.max(0, Number(currentSavings) || 0);
+  const months = Math.max(1, Number(termMonths) || 1);
+  const rate = Math.max(0, Number(annualRate) || 0);
+  const budgeted = Math.max(0, Number(budgetedSavings) || 0);
+  const income = Math.max(0, Number(totalIncome) || 0);
+
+  const remainingToSave = Math.max(0, target - current);
+  const savedPercent = target > 0 ? (current / target) * 100 : 0;
+
+  // Cálculo de cuota mensual necesaria (PMT)
+  let monthlyRequired = 0;
+  if (rate <= 0) {
+    monthlyRequired = months > 0 ? remainingToSave / months : 0;
+  } else {
+    const r = (rate / 100) / 12;
+    const fvCurrent = current * Math.pow(1 + r, months);
+    const remAtFuture = target - fvCurrent;
+    if (remAtFuture <= 0) {
+      monthlyRequired = 0;
+    } else {
+      monthlyRequired = remAtFuture * (r / (Math.pow(1 + r, months) - 1));
+    }
+  }
+
+  // Desgloses temporales
+  const biweekly = monthlyRequired / 2;
+  const weekly = (monthlyRequired * 12) / 52;
+  const daily = (monthlyRequired * 12) / 365;
+
+  // Fechas
+  const baseDateObj = parseISODate(startDate);
+  const targetDateObj = addMonthsSafe(baseDateObj, months);
+  const targetDateFormatted = formatDateDDMMYYYY(targetDateObj);
+  const startDateFormatted = formatDateDDMMYYYY(baseDateObj);
+
+  // Compatibilidad presupuestaria
+  const monthlyDiff = budgeted - monthlyRequired;
+  const isBudgetDeficit = monthlyDiff < -0.01;
+  const isBudgetSurplus = monthlyDiff >= -0.01;
+  const incomePercentNeeded = income > 0 ? (monthlyRequired / income) * 100 : 0;
+  const monthsWithBudgetedSavings = budgeted > 0 ? Math.ceil(remainingToSave / budgeted) : Infinity;
+
+  // Plan mes a mes
+  const r = (rate / 100) / 12;
+  const schedule = [];
+  let runningBalance = current;
+
+  for (let i = 1; i <= months; i++) {
+    const monthDateObj = addMonthsSafe(baseDateObj, i);
+    const monthInterest = rate > 0 ? runningBalance * r : 0;
+    runningBalance = runningBalance + monthInterest + monthlyRequired;
+    const isLastMonth = i === months;
+    const displayedAccumulated = isLastMonth ? Math.max(runningBalance, target) : runningBalance;
+    const pct = target > 0 ? (displayedAccumulated / target) * 100 : 100;
+
+    schedule.push({
+      month: i,
+      date: formatDateDDMMYYYY(monthDateObj),
+      aporte: monthlyRequired,
+      interest: monthInterest,
+      accumulated: displayedAccumulated,
+      percent: Math.min(100, Math.round(pct)),
+      percentExact: Math.min(100, pct)
+    });
+  }
+
+  return {
+    goalName,
+    targetAmount: target,
+    currentSavings: current,
+    termMonths: months,
+    startDate,
+    startDateFormatted,
+    annualRate: rate,
+    remainingToSave,
+    savedPercent,
+    monthlyRequired,
+    biweekly,
+    weekly,
+    daily,
+    targetDateFormatted,
+    budgetedSavings: budgeted,
+    monthlyDiff,
+    isBudgetDeficit,
+    isBudgetSurplus,
+    incomePercentNeeded,
+    monthsWithBudgetedSavings,
+    schedule
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

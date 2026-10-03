@@ -32,7 +32,10 @@ import {
   ICONS_OPTIONS,
   ALLOCATION_COLOR_PALETTE,
   METRIC_CARD_THEMES,
-  NAV_ITEMS
+  NAV_ITEMS,
+  calculateGoalProjection,
+  DEFAULT_GOAL,
+  GOAL_STORAGE_KEY
 } from "./diana-master.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,6 +183,13 @@ function NavIcon({ type }) {
           <rect x="14" y="3" width="7" height="7" />
           <rect x="14" y="14" width="7" height="7" />
           <rect x="3" y="14" width="7" height="7" />
+        </svg>
+      );
+    case "trending":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+          <polyline points="17 6 23 6 23 12" />
         </svg>
       );
     case "list":
@@ -1334,12 +1344,546 @@ export function Overview() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 10. PROYECCIÓN DE METAS DE AHORRO (GOALPROJECTIONPAGE)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function GoalProjectionPage() {
+  const { categories, totalIncome } = useBudget();
+
+  // Buscar categoría de ahorro en el presupuesto activo
+  const ahorroCat = useMemo(() => {
+    return categories.find((c) =>
+      c.id === "ahorro" ||
+      c.name.toLowerCase().includes("ahorro") ||
+      (c.type && c.type.toLowerCase().includes("patrimonio"))
+    );
+  }, [categories]);
+
+  const activeBudgetedSavings = ahorroCat ? Number(ahorroCat.budgeted) || 0 : 1000;
+
+  // Estados del formulario persistidos en localStorage
+  const [goalName, setGoalName] = useState(() => {
+    try {
+      const saved = localStorage.getItem(GOAL_STORAGE_KEY);
+      if (saved) return JSON.parse(saved).goalName || DEFAULT_GOAL.goalName;
+    } catch (e) {}
+    return DEFAULT_GOAL.goalName;
+  });
+
+  const [targetAmount, setTargetAmount] = useState(() => {
+    try {
+      const saved = localStorage.getItem(GOAL_STORAGE_KEY);
+      if (saved) return JSON.parse(saved).targetAmount ?? DEFAULT_GOAL.targetAmount;
+    } catch (e) {}
+    return DEFAULT_GOAL.targetAmount;
+  });
+
+  const [currentSavings, setCurrentSavings] = useState(() => {
+    try {
+      const saved = localStorage.getItem(GOAL_STORAGE_KEY);
+      if (saved) return JSON.parse(saved).currentSavings ?? DEFAULT_GOAL.currentSavings;
+    } catch (e) {}
+    return DEFAULT_GOAL.currentSavings;
+  });
+
+  const [termMonths, setTermMonths] = useState(() => {
+    try {
+      const saved = localStorage.getItem(GOAL_STORAGE_KEY);
+      if (saved) return JSON.parse(saved).termMonths ?? DEFAULT_GOAL.termMonths;
+    } catch (e) {}
+    return DEFAULT_GOAL.termMonths;
+  });
+
+  const [startDate, setStartDate] = useState(() => {
+    try {
+      const saved = localStorage.getItem(GOAL_STORAGE_KEY);
+      if (saved) return JSON.parse(saved).startDate || DEFAULT_GOAL.startDate;
+    } catch (e) {}
+    return DEFAULT_GOAL.startDate;
+  });
+
+  const [annualRate, setAnnualRate] = useState(() => {
+    try {
+      const saved = localStorage.getItem(GOAL_STORAGE_KEY);
+      if (saved) return JSON.parse(saved).annualRate ?? DEFAULT_GOAL.annualRate;
+    } catch (e) {}
+    return DEFAULT_GOAL.annualRate;
+  });
+
+  // Guardar en localStorage ante cambios
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        GOAL_STORAGE_KEY,
+        JSON.stringify({
+          goalName,
+          targetAmount,
+          currentSavings,
+          termMonths,
+          startDate,
+          annualRate,
+        })
+      );
+    } catch (e) {}
+  }, [goalName, targetAmount, currentSavings, termMonths, startDate, annualRate]);
+
+  // Cálculo integral de la proyección
+  const projection = useMemo(() => {
+    return calculateGoalProjection({
+      goalName,
+      targetAmount,
+      currentSavings,
+      termMonths,
+      startDate,
+      annualRate,
+      budgetedSavings: activeBudgetedSavings,
+      totalIncome: totalIncome || 17000,
+    });
+  }, [goalName, targetAmount, currentSavings, termMonths, startDate, annualRate, activeBudgetedSavings, totalIncome]);
+
+  // Presets para facilitar pruebas y uso rápido
+  const PRESETS = [
+    {
+      label: "Ejemplo Excel",
+      goalName: "Meta de ahorro",
+      targetAmount: 90000,
+      currentSavings: 10000,
+      termMonths: 6,
+      startDate: "2026-09-29",
+      annualRate: 0,
+    },
+    {
+      label: "Fondo Emergencia",
+      goalName: "Fondo de Emergencia (6 meses)",
+      targetAmount: 60000,
+      currentSavings: 15000,
+      termMonths: 12,
+      startDate: "2026-10-01",
+      annualRate: 8.5,
+    },
+    {
+      label: "Viaje Europa",
+      goalName: "Vacaciones en Europa",
+      targetAmount: 45000,
+      currentSavings: 5000,
+      termMonths: 8,
+      startDate: "2026-10-01",
+      annualRate: 0,
+    },
+    {
+      label: "Enganche Auto",
+      goalName: "Enganche de Automóvil",
+      targetAmount: 120000,
+      currentSavings: 20000,
+      termMonths: 24,
+      startDate: "2026-10-01",
+      annualRate: 10.0,
+    },
+  ];
+
+  const handleApplyPreset = (p) => {
+    setGoalName(p.goalName);
+    setTargetAmount(p.targetAmount);
+    setCurrentSavings(p.currentSavings);
+    setTermMonths(p.termMonths);
+    setStartDate(p.startDate);
+    setAnnualRate(p.annualRate);
+  };
+
+  const QUICK_MONTHS = [3, 6, 9, 12, 18, 24, 36];
+
+  return (
+    <div className="projection-container" id="proyeccion-view">
+      <Header />
+
+      {/* Cabecera de la calculadora */}
+      <div className="projection-hero-header">
+        <div className="projection-hero-top">
+          <div className="projection-hero-titles">
+            <span className="projection-pill-tag">PLANIFICADOR FINANCIERO</span>
+            <h1 className="projection-hero-title">Proyección de Metas</h1>
+            <h2 className="projection-hero-subtitle">Calculadora de Metas de Ahorro</h2>
+          </div>
+
+          <div className="projection-presets-wrapper">
+            <span className="presets-label">Plantillas Rápidas:</span>
+            <div className="presets-buttons">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  className={`preset-btn ${goalName === p.goalName ? "active" : ""}`}
+                  onClick={() => handleApplyPreset(p)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Banner de alerta de compatibilidad con el presupuesto */}
+        {projection.isBudgetDeficit ? (
+          <div className="projection-alert alert-deficit" id="alert-deficit">
+            <span className="alert-icon">⚠️</span>
+            <div className="alert-text-group">
+              <strong>Te faltan {formatCurrency(Math.abs(projection.monthlyDiff))} al mes</strong> sobre tu ahorro presupuestado ({formatCurrency(projection.budgetedSavings)}/mes)
+            </div>
+          </div>
+        ) : (
+          <div className="projection-alert alert-surplus" id="alert-surplus">
+            <span className="alert-icon">✅</span>
+            <div className="alert-text-group">
+              <strong>¡Meta viable y cubierta!</strong> Tu ahorro presupuestado de {formatCurrency(projection.budgetedSavings)}/mes cubre tu cuota con un superávit de {formatCurrency(projection.monthlyDiff)} al mes.
+            </div>
+          </div>
+        )}
+
+        <p className="projection-hero-desc">
+          Define tu meta y el plazo: te decimos cuánto ahorrar cada mes para lograrla.
+        </p>
+      </div>
+
+      {/* Sección 1: Formulario Datos de tu Meta */}
+      <div className="projection-card form-card" id="card-datos-meta">
+        <div className="projection-card-header">
+          <div className="card-header-icon-box">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="projection-card-title">Datos de tu meta</h3>
+            <p className="projection-card-subtitle">Ingresa los parámetros clave de tu objetivo de ahorro</p>
+          </div>
+        </div>
+
+        <div className="goal-form-grid">
+          {/* Nombre de la meta */}
+          <div className="goal-field">
+            <div className="field-label-group">
+              <label htmlFor="goal-name">Nombre de la meta</label>
+              <span className="field-hint">¿Para qué estás ahorrando?</span>
+            </div>
+            <input
+              type="text"
+              id="goal-name"
+              className="goal-input"
+              value={goalName}
+              onChange={(e) => setGoalName(e.target.value)}
+              placeholder="Ej. Meta de ahorro"
+            />
+          </div>
+
+          {/* Monto de la meta */}
+          <div className="goal-field">
+            <div className="field-label-group">
+              <label htmlFor="goal-target">Monto de la meta ($)</label>
+              <span className="field-hint">Cuánto dinero quieres juntar en total</span>
+            </div>
+            <div className="input-currency-wrapper">
+              <span className="currency-symbol">$</span>
+              <input
+                type="number"
+                id="goal-target"
+                className="goal-input currency-input"
+                value={targetAmount}
+                min="0"
+                step="any"
+                onChange={(e) => setTargetAmount(e.target.value)}
+                placeholder="90000"
+              />
+            </div>
+          </div>
+
+          {/* Ahorro actual */}
+          <div className="goal-field">
+            <div className="field-label-group">
+              <label htmlFor="goal-current">Ahorro actual ($)</label>
+              <span className="field-hint">Lo que ya tienes guardado para esta meta</span>
+            </div>
+            <div className="input-currency-wrapper">
+              <span className="currency-symbol">$</span>
+              <input
+                type="number"
+                id="goal-current"
+                className="goal-input currency-input"
+                value={currentSavings}
+                min="0"
+                step="any"
+                onChange={(e) => setCurrentSavings(e.target.value)}
+                placeholder="10000"
+              />
+            </div>
+          </div>
+
+          {/* Plazo en meses */}
+          <div className="goal-field">
+            <div className="field-label-group">
+              <label htmlFor="goal-months">Plazo (meses)</label>
+              <span className="field-hint">En cuántos meses quieres lograrla (máximo 36)</span>
+            </div>
+            <div className="months-input-group">
+              <input
+                type="number"
+                id="goal-months"
+                className="goal-input months-input"
+                value={termMonths}
+                min="1"
+                max="60"
+                onChange={(e) => setTermMonths(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+              <div className="quick-chips-wrapper">
+                {QUICK_MONTHS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`quick-chip ${termMonths === m ? "active" : ""}`}
+                    onClick={() => setTermMonths(m)}
+                  >
+                    {m}m
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Fecha de inicio */}
+          <div className="goal-field">
+            <div className="field-label-group">
+              <label htmlFor="goal-date">Fecha de inicio</label>
+              <span className="field-hint">Desde cuándo empiezas a ahorrar</span>
+            </div>
+            <input
+              type="date"
+              id="goal-date"
+              className="goal-input"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </div>
+
+          {/* Rendimiento anual estimado */}
+          <div className="goal-field">
+            <div className="field-label-group">
+              <label htmlFor="goal-rate">Rendimiento anual estimado (%)</label>
+              <span className="field-hint">Opcional: interés anual si tu ahorro genera rendimiento (0% = sin interés)</span>
+            </div>
+            <div className="input-percent-wrapper">
+              <input
+                type="number"
+                id="goal-rate"
+                className="goal-input percent-input"
+                value={annualRate}
+                min="0"
+                max="100"
+                step="0.1"
+                onChange={(e) => setAnnualRate(parseFloat(e.target.value) || 0)}
+                placeholder="0.0"
+              />
+              <span className="percent-symbol">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sección 2: Resultados (Grid de 6 Tarjetas KPI) */}
+      <div className="projection-results-section" id="section-resultados">
+        <h3 className="section-title">Resultado</h3>
+        <div className="results-kpi-grid">
+          {/* 1. Ahorro Mensual Necesario (Destacada) */}
+          <div className="result-kpi-card featured-emerald">
+            <div className="kpi-top">
+              <span className="kpi-label">AHORRO MENSUAL NECESARIO</span>
+              <span className="kpi-badge-pill">Prioritario</span>
+            </div>
+            <div className="kpi-value text-emerald">{formatCurrency(projection.monthlyRequired)}</div>
+            <div className="kpi-subtext">durante {projection.termMonths} meses</div>
+          </div>
+
+          {/* 2. Por Quincena */}
+          <div className="result-kpi-card">
+            <div className="kpi-top">
+              <span className="kpi-label">POR QUINCENA</span>
+            </div>
+            <div className="kpi-value">{formatCurrency(projection.biweekly)}</div>
+            <div className="kpi-subtext">cada 15 días</div>
+          </div>
+
+          {/* 3. Por Semana */}
+          <div className="result-kpi-card">
+            <div className="kpi-top">
+              <span className="kpi-label">POR SEMANA</span>
+            </div>
+            <div className="kpi-value">{formatCurrency(projection.weekly)}</div>
+            <div className="kpi-subtext">cada semana</div>
+          </div>
+
+          {/* 4. Por Día */}
+          <div className="result-kpi-card">
+            <div className="kpi-top">
+              <span className="kpi-label">POR DÍA</span>
+            </div>
+            <div className="kpi-value">{formatCurrency(projection.daily)}</div>
+            <div className="kpi-subtext">cada día</div>
+          </div>
+
+          {/* 5. Fecha Objetivo */}
+          <div className="result-kpi-card">
+            <div className="kpi-top">
+              <span className="kpi-label">FECHA OBJETIVO</span>
+            </div>
+            <div className="kpi-value text-indigo">{projection.targetDateFormatted}</div>
+            <div className="kpi-subtext">cuando llegas a tu meta</div>
+          </div>
+
+          {/* 6. Falta por Ahorrar */}
+          <div className="result-kpi-card">
+            <div className="kpi-top">
+              <span className="kpi-label">FALTA POR AHORRAR</span>
+            </div>
+            <div className="kpi-value">{formatCurrency(projection.remainingToSave)}</div>
+            <div className="kpi-subtext">
+              <strong className="text-emerald">{projection.savedPercent.toFixed(0)}%</strong> de la meta ya ahorrado
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sección 3: Compatibilidad con tu Presupuesto */}
+      <div className="projection-card compat-card" id="card-compatibilidad">
+        <div className="projection-card-header">
+          <div className="card-header-icon-box bg-indigo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="projection-card-title">Compatibilidad con tu presupuesto</h3>
+            <p className="projection-card-subtitle">Cruce de tu meta con tu ingreso y ahorro activo en la pestaña Presupuesto</p>
+          </div>
+        </div>
+
+        <div className="compat-table-wrapper">
+          <table className="compat-table">
+            <tbody>
+              <tr>
+                <td className="compat-item-name">Ahorro mensual necesario</td>
+                <td className="compat-item-value bold">{formatCurrency(projection.monthlyRequired)}</td>
+                <td className="compat-item-desc">Lo que necesitas apartar cada mes</td>
+              </tr>
+              <tr>
+                <td className="compat-item-name">Ahorro presupuestado</td>
+                <td className="compat-item-value">{formatCurrency(projection.budgetedSavings)}</td>
+                <td className="compat-item-desc">Tu ahorro mensual en la hoja Presupuesto</td>
+              </tr>
+              <tr className="compat-highlight-row">
+                <td className="compat-item-name">Diferencia mensual</td>
+                <td className="compat-item-value">
+                  <span className={`diff-pill-badge ${projection.monthlyDiff >= 0 ? "diff-zero" : "diff-warn"}`}>
+                    {projection.monthlyDiff < 0
+                      ? `-${formatCurrency(Math.abs(projection.monthlyDiff))}`
+                      : `+${formatCurrency(projection.monthlyDiff)}`}
+                  </span>
+                </td>
+                <td className="compat-item-desc">Positivo = te sobra · Negativo = te falta</td>
+              </tr>
+              <tr>
+                <td className="compat-item-name">% de tu sueldo necesario</td>
+                <td className="compat-item-value bold">{projection.incomePercentNeeded.toFixed(1)}%</td>
+                <td className="compat-item-desc">Porcentaje de tu ingreso base que debes ahorrar</td>
+              </tr>
+              <tr>
+                <td className="compat-item-name">Meses con tu ahorro presupuestado</td>
+                <td className="compat-item-value bold">
+                  {isFinite(projection.monthsWithBudgetedSavings) ? `${projection.monthsWithBudgetedSavings} meses` : "N/A"}
+                </td>
+                <td className="compat-item-desc">En cuántos meses llegarías si ahorras solo lo presupuestado</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Sección 4: Plan Mes a Mes */}
+      <div className="projection-card schedule-card" id="card-plan-mes">
+        <div className="projection-card-header">
+          <div className="card-header-icon-box bg-cyan">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="projection-card-title">Plan mes a mes</h3>
+            <p className="projection-card-subtitle">Cronograma de depósitos acumulados y avance porcentual hacia tu meta</p>
+          </div>
+        </div>
+
+        <div className="table-responsive">
+          <table className="schedule-table">
+            <thead>
+              <tr>
+                <th className="th-month">MES</th>
+                <th className="th-date">FECHA</th>
+                <th className="th-aporte">APORTE</th>
+                <th className="th-accum">ACUMULADO</th>
+                <th className="th-pct">% DE LA META</th>
+                <th className="th-progress">PROGRESO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projection.schedule.map((item, idx) => {
+                const isMilestone = idx === projection.schedule.length - 1;
+
+                return (
+                  <tr key={item.month} className={`schedule-row ${isMilestone ? "milestone-row" : ""}`}>
+                    <td className="cell-month">
+                      <span className="month-number">{item.month}</span>
+                    </td>
+                    <td className="cell-date">{item.date}</td>
+                    <td className="cell-aporte">{formatCurrency(item.aporte)}</td>
+                    <td className="cell-accum">
+                      <strong>{formatCurrency(item.accumulated)}</strong>
+                    </td>
+                    <td className="cell-pct">
+                      <span className={`pct-tag ${isMilestone ? "pct-milestone" : ""}`}>
+                        {item.percent}%
+                      </span>
+                    </td>
+                    <td className="cell-progress">
+                      <div className="schedule-progress-track">
+                        <div
+                          className="schedule-progress-bar"
+                          style={{ width: `${item.percentExact}%` }}
+                        />
+                      </div>
+                      {isMilestone && <span className="milestone-badge">Meta 🎯</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 11. COMPONENTE RAÍZ DE LA APLICACIÓN (DIANAAPP)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PAGES = {
   overview: <Overview />,
-  summary: <PlaceholderPage title="Summary" description="Resumen detallado de tus finanzas con gráficos y estadísticas." />,
+  proyeccion: <GoalProjectionPage />,
+  summary: <GoalProjectionPage />, // retrocompatibilidad con enlaces anteriores
   distribution: <PlaceholderPage title="Distribución" description="Visualiza cómo se distribuye tu presupuesto por categorías." />,
   cards: <PlaceholderPage title="Tarjetas" description="Administra tus tarjetas de crédito y débito." />,
   settings: <PlaceholderPage title="Settings" description="Configura las preferencias de tu presupuesto." />,
