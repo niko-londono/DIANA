@@ -6,14 +6,15 @@
  * 1. Constantes y configuración (API Google Sheets, Categorías base, Temas, Meses)
  * 2. Utilidades y Formateadores numéricos / de moneda
  * 3. Metadatos de Categorías (tipos, badges, colores, íconos)
- * 4. Reducer de Presupuesto (acciones CRUD, toggles, reset)
- * 5. Sincronización en la nube (Google Apps Script) + Respaldo Local (localStorage)
+ * 4. Reducer de Presupuesto POR MES (acciones CRUD, toggles, reset, clonado de mes)
+ * 5. Sincronización en la nube (Google Apps Script) + Respaldo Local (localStorage),
+ *    con los datos de cada mes guardados de forma independiente
  * 6. React Context y Custom Hook (BudgetContext, BudgetProvider, useBudget)
  * 7. Funciones de exportación (CSV) y cálculos de balance
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
-import { createContext, useContext, useReducer, useEffect, useState, useRef, createElement } from "react";
+import { createContext, useContext, useReducer, useEffect, useState, useRef, useMemo, useCallback, createElement } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. CONFIGURACIÓN Y CONSTANTES DEL SISTEMA
@@ -23,12 +24,50 @@ export const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz2GE95BLK0AT
 
 export const LOCAL_STORAGE_KEY = "finanzas_backup";
 
-export const MONTHS = [
-  "Enero 2024", "Febrero 2024", "Marzo 2024", "Abril 2024",
-  "Mayo 2024", "Junio 2024", "Julio 2024", "Agosto 2024",
-  "Septiembre 2024", "Octubre 2024", "Noviembre 2024", "Diciembre 2024",
-  "Enero 2025", "Febrero 2025", "Marzo 2025"
+export const MONTH_NAMES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
+
+export const MONTH_NAMES_SHORT = [
+  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
+];
+
+// Rango de años navegable en el selector de mes
+export const MIN_YEAR = 2020;
+export const MAX_YEAR = 2100;
+
+/** Clave de mes en formato "YYYY-MM" (monthIndex: 0 = enero) */
+export function getMonthKey(year, monthIndex) {
+  return `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+}
+
+/** Clave del mes actual según la fecha del dispositivo */
+export function getCurrentMonthKey() {
+  const now = new Date();
+  return getMonthKey(now.getFullYear(), now.getMonth());
+}
+
+export function isValidMonthKey(key) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(key));
+}
+
+/** "2026-10" -> { year: 2026, monthIndex: 9 } */
+export function parseMonthKey(key) {
+  const [year, month] = String(key).split("-").map(Number);
+  return { year, monthIndex: month - 1 };
+}
+
+/** "2026-10" -> "Octubre 2026" (o "Oct 2026" con short = true) */
+export function formatMonthLabel(key, short = false) {
+  if (!isValidMonthKey(key)) return "";
+  const { year, monthIndex } = parseMonthKey(key);
+  return `${(short ? MONTH_NAMES_SHORT : MONTH_NAMES)[monthIndex]} ${year}`;
+}
+
+/** @deprecated Se conserva solo por compatibilidad con re-exports antiguos. */
+export const MONTHS = MONTH_NAMES.map((name) => `${name} ${new Date().getFullYear()}`);
 
 export const CATEGORY_TYPES = [
   "Gasto Fijo",
@@ -254,7 +293,7 @@ export function getCategoryDiff(parent, allCategories) {
 // 4. EXPORTACIÓN A CSV
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function exportBudgetToCSV(categories, totalIncome, totalExpenses, remainingBalance) {
+export function exportBudgetToCSV(categories, totalIncome, totalExpenses, remainingBalance, monthKey) {
   const rows = [
     ["Categoría", "Tipo", "Presupuestado", "Proporción (% Sueldo)", "Diferencia"],
   ];
@@ -276,7 +315,7 @@ export function exportBudgetToCSV(categories, totalIncome, totalExpenses, remain
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `presupuesto_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute("download", `presupuesto_${monthKey || new Date().toISOString().slice(0, 7)}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -439,36 +478,155 @@ export function calculateGoalProjection({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. REDUCER DEL PRESUPUESTO
+// 6. PRESUPUESTO POR MES: RESOLUCIÓN, CLONADO Y SERIALIZACIÓN
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Cada mes tiene su propia lista de categorías:
+//   byMonth = { "2026-10": [ ...categorías ], "2026-11": [ ...categorías ] }
+// Editar, crear o eliminar categorías solo afecta al mes seleccionado.
+
+function cloneCategories(list) {
+  return list.map((c) => ({ ...c }));
+}
+
+/**
+ * Devuelve las categorías de un mes. Si el mes aún no tiene datos, devuelve (sin guardar)
+ * una copia base: el mes anterior más cercano con datos, si no el siguiente, si no la plantilla.
+ */
+export function resolveMonthCategories(byMonth, monthKey) {
+  const own = byMonth[monthKey];
+  if (Array.isArray(own) && own.length > 0) return own;
+
+  const keysWithData = Object.keys(byMonth)
+    .filter((k) => Array.isArray(byMonth[k]) && byMonth[k].length > 0)
+    .sort();
+  const source =
+    [...keysWithData].reverse().find((k) => k < monthKey) ||
+    keysWithData.find((k) => k > monthKey);
+
+  return source ? byMonth[source] : DEFAULT_CATEGORIES;
+}
+
+// En Google Sheets (hoja "Categorias", mismas 6 columnas) el mes viaja dentro del id:
+//   id "gastos-m" del mes 2026-10  ->  "2026-10::gastos-m"
+// Así no hace falta cambiar Code.gs. Las filas antiguas, sin prefijo, se asignan al mes actual.
+const MONTH_ID_SEPARATOR = "::";
+
+function splitMonthId(value) {
+  const str = String(value ?? "");
+  const idx = str.indexOf(MONTH_ID_SEPARATOR);
+  if (idx === -1) return { key: null, id: str };
+  const key = str.slice(0, idx);
+  return isValidMonthKey(key)
+    ? { key, id: str.slice(idx + MONTH_ID_SEPARATOR.length) }
+    : { key: null, id: str };
+}
+
+/** { mes: [categorías] } -> filas planas para Google Sheets */
+export function serializeByMonth(byMonth) {
+  const rows = [];
+  Object.keys(byMonth).sort().forEach((key) => {
+    (byMonth[key] || []).forEach((c) => {
+      rows.push({
+        ...c,
+        id: `${key}${MONTH_ID_SEPARATOR}${c.id}`,
+        parentId: c.parentId ? `${key}${MONTH_ID_SEPARATOR}${c.parentId}` : null,
+      });
+    });
+  });
+  return rows;
+}
+
+/** Filas planas de Google Sheets -> { mes: [categorías] } (filas sin mes van a fallbackKey) */
+export function deserializeRows(rows, fallbackKey) {
+  const byMonth = {};
+  rows.forEach((row) => {
+    const own = splitMonthId(row.id);
+    const key = own.key || fallbackKey;
+    const parent = row.parentId ? splitMonthId(row.parentId) : null;
+    const cat = { ...row, id: own.id, parentId: parent ? parent.id : null };
+    (byMonth[key] = byMonth[key] || []).push(cat);
+  });
+  return byMonth;
+}
+
+function readLocalBackup(fallbackKey) {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Formato anterior: arreglo plano de categorías (sin meses)
+    if (Array.isArray(parsed)) {
+      return parsed.length > 0 ? deserializeRows(parsed, fallbackKey) : null;
+    }
+    if (parsed && parsed.byMonth && typeof parsed.byMonth === "object") {
+      return Object.keys(parsed.byMonth).length > 0 ? parsed.byMonth : null;
+    }
+  } catch (e) {
+    console.warn("No se pudo leer el respaldo local:", e);
+  }
+  return null;
+}
+
+function writeLocalBackup(byMonth) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ version: 2, byMonth }));
+  } catch (e) {
+    console.warn("No se pudo guardar el respaldo local:", e);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. REDUCER DEL PRESUPUESTO (POR MES)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Aplica un cambio solo a las categorías del mes indicado
+function updateMonth(state, monthKey, updater) {
+  const current = resolveMonthCategories(state.byMonth, monthKey);
+  return { ...state, byMonth: { ...state.byMonth, [monthKey]: updater(current) } };
+}
+
+// Todas las acciones reciben `monthKey` (lo agrega el Provider automáticamente)
 export function budgetReducer(state, action) {
+  const monthKey = action.monthKey || getCurrentMonthKey();
+
   switch (action.type) {
+    case "LOAD_ALL": {
+      return { ...state, byMonth: action.payload || {} };
+    }
+    case "ENSURE_MONTH": {
+      // Primera vez que se abre un mes: se crea como copia independiente del mes anterior
+      const existing = state.byMonth[monthKey];
+      if (Array.isArray(existing) && existing.length > 0) return state;
+      const base = cloneCategories(resolveMonthCategories(state.byMonth, monthKey));
+      return { ...state, byMonth: { ...state.byMonth, [monthKey]: base } };
+    }
     case "SET_CATEGORIES": {
-      return { ...state, categories: action.payload };
+      return updateMonth(state, monthKey, () => action.payload);
     }
     case "ADD_CATEGORY": {
-      const newCat = {
-        id: action.payload.id || action.payload.name.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now(),
-        name: action.payload.name,
-        budgeted: Number(action.payload.budgeted) || 0,
-        parentId: action.payload.parentId || null,
-        canDelete: action.payload.canDelete !== false,
-        expanded: false,
-        type: action.payload.type || "Gasto Fijo",
-        subtext: action.payload.subtext || "",
-        icon: action.payload.parentId ? null : (action.payload.icon || "default")
-      };
-      const updatedCategories = action.payload.parentId
-        ? state.categories.map((c) => c.id === action.payload.parentId ? { ...c, expanded: true } : c)
-        : state.categories;
+      return updateMonth(state, monthKey, (cats) => {
+        const newCat = {
+          id: action.payload.id || action.payload.name.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now(),
+          name: action.payload.name,
+          budgeted: Number(action.payload.budgeted) || 0,
+          parentId: action.payload.parentId || null,
+          canDelete: action.payload.canDelete !== false,
+          expanded: false,
+          type: action.payload.type || "Gasto Fijo",
+          subtext: action.payload.subtext || "",
+          icon: action.payload.parentId ? null : (action.payload.icon || "default")
+        };
+        const updatedCategories = action.payload.parentId
+          ? cats.map((c) => c.id === action.payload.parentId ? { ...c, expanded: true } : c)
+          : cats;
 
-      return { ...state, categories: [...updatedCategories, newCat] };
+        return [...updatedCategories, newCat];
+      });
     }
     case "UPDATE_CATEGORY": {
-      return {
-        ...state,
-        categories: state.categories.map((cat) =>
+      return updateMonth(state, monthKey, (cats) =>
+        cats.map((cat) =>
           cat.id === action.payload.id
             ? {
                 ...cat,
@@ -481,42 +639,40 @@ export function budgetReducer(state, action) {
               }
             : cat
         )
-      };
+      );
     }
     case "UPDATE_BUDGET": {
-      return {
-        ...state,
-        categories: state.categories.map((cat) =>
+      return updateMonth(state, monthKey, (cats) =>
+        cats.map((cat) =>
           cat.id === action.payload.id ? { ...cat, budgeted: Number(action.payload.budgeted) || 0 } : cat
-        ),
-      };
+        )
+      );
     }
     case "UPDATE_NAME": {
-      return {
-        ...state,
-        categories: state.categories.map((cat) =>
+      return updateMonth(state, monthKey, (cats) =>
+        cats.map((cat) =>
           cat.id === action.payload.id ? { ...cat, name: action.payload.name } : cat
-        ),
-      };
+        )
+      );
     }
     case "DELETE_CATEGORY": {
-      return {
-        ...state,
-        categories: state.categories.filter(
-          (cat) => cat.id !== action.payload.id && cat.parentId !== action.payload.id
-        ),
-      };
+      return updateMonth(state, monthKey, (cats) =>
+        cats.filter((cat) => cat.id !== action.payload.id && cat.parentId !== action.payload.id)
+      );
     }
     case "TOGGLE_EXPAND": {
-      return {
-        ...state,
-        categories: state.categories.map((cat) =>
+      return updateMonth(state, monthKey, (cats) =>
+        cats.map((cat) =>
           cat.id === action.payload.id ? { ...cat, expanded: !cat.expanded } : cat
-        ),
-      };
+        )
+      );
     }
     case "RESET": {
-      return { categories: DEFAULT_CATEGORIES };
+      // Restablece únicamente el mes seleccionado
+      return {
+        ...state,
+        byMonth: { ...state.byMonth, [monthKey]: cloneCategories(DEFAULT_CATEGORIES) }
+      };
     }
     default:
       return state;
@@ -524,64 +680,67 @@ export function budgetReducer(state, action) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. REACT CONTEXT Y PROVIDER
+// 8. REACT CONTEXT Y PROVIDER
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const BudgetContext = createContext(null);
 
 export function BudgetProvider({ children }) {
-  const [state, dispatch] = useReducer(budgetReducer, { categories: [] });
+  const [state, rawDispatch] = useReducer(budgetReducer, { byMonth: {} });
   const [isLoading, setIsLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState("saved"); // "saved", "saving", "error"
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey); // "YYYY-MM"
   const isFirstRender = useRef(true);
+
+  // dispatch que etiqueta cada acción con el mes seleccionado
+  const dispatch = useCallback(
+    (action) => rawDispatch({ monthKey: selectedMonth, ...action }),
+    [selectedMonth]
+  );
 
   // 1. Cargar datos desde Google Sheets al iniciar (con fallback a localStorage)
   useEffect(() => {
+    // Filas antiguas (sin mes) se asignan al mes actual
+    const legacyMonthKey = getCurrentMonthKey();
+
     async function fetchData() {
+      let byMonth = null;
       try {
         const response = await fetch(SCRIPT_URL);
         const data = await response.json();
         if (data && Array.isArray(data.categories) && data.categories.length > 0) {
-          dispatch({ type: "SET_CATEGORIES", payload: data.categories });
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data.categories));
+          byMonth = deserializeRows(data.categories, legacyMonthKey);
         } else if (data && data.error) {
           console.warn("Respuesta de Google Sheets:", data.error);
-          const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-          dispatch({
-            type: "SET_CATEGORIES",
-            payload: local ? JSON.parse(local) : DEFAULT_CATEGORIES
-          });
-        } else {
-          const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-          dispatch({
-            type: "SET_CATEGORIES",
-            payload: local ? JSON.parse(local) : DEFAULT_CATEGORIES
-          });
         }
       } catch (e) {
         console.error("Error al cargar desde Google Sheets:", e);
-        const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-        dispatch({
-          type: "SET_CATEGORIES",
-          payload: local ? JSON.parse(local) : DEFAULT_CATEGORIES
-        });
-      } finally {
-        setIsLoading(false);
       }
+
+      if (!byMonth) byMonth = readLocalBackup(legacyMonthKey);
+
+      rawDispatch({ type: "LOAD_ALL", payload: byMonth || {} });
+      setIsLoading(false);
     }
     fetchData();
   }, []);
 
-  // 2. Guardar datos en Google Sheets cada vez que cambien (debounced a 1s)
+  // 2. Al abrir un mes por primera vez, crearlo como copia independiente del mes anterior
+  useEffect(() => {
+    if (isLoading) return;
+    rawDispatch({ type: "ENSURE_MONTH", monthKey: selectedMonth });
+  }, [selectedMonth, isLoading]);
+
+  // 3. Guardar datos en Google Sheets cada vez que cambien (debounced a 1s)
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
-    if (isLoading || state.categories.length === 0) return;
+    if (isLoading || Object.keys(state.byMonth).length === 0) return;
 
     // Respaldo instantáneo en localStorage
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.categories));
+    writeLocalBackup(state.byMonth);
 
     // Sincronización en segundo plano con Google Sheets
     setSyncStatus("saving");
@@ -593,7 +752,7 @@ export function BudgetProvider({ children }) {
           headers: {
             "Content-Type": "text/plain;charset=utf-8",
           },
-          body: JSON.stringify({ categories: state.categories })
+          body: JSON.stringify({ categories: serializeByMonth(state.byMonth) })
         });
         setSyncStatus("saved");
       } catch (e) {
@@ -607,10 +766,19 @@ export function BudgetProvider({ children }) {
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [state.categories, isLoading]);
+  }, [state.byMonth, isLoading]);
 
-  // Valores Computados
-  const categories = state.categories;
+  // Valores Computados (siempre del mes seleccionado)
+  const categories = useMemo(
+    () => (isLoading ? [] : resolveMonthCategories(state.byMonth, selectedMonth)),
+    [state.byMonth, selectedMonth, isLoading]
+  );
+
+  // Meses que ya tienen un presupuesto guardado (para marcarlos en el selector)
+  const monthsWithData = useMemo(
+    () => Object.keys(state.byMonth).filter((k) => state.byMonth[k] && state.byMonth[k].length > 0),
+    [state.byMonth]
+  );
 
   const totalIncome = categories
     .filter((c) => c.id === "sueldo")
@@ -636,6 +804,10 @@ export function BudgetProvider({ children }) {
         dispatch,
         isLoading,
         syncStatus,
+        selectedMonth,
+        setSelectedMonth,
+        selectedMonthLabel: formatMonthLabel(selectedMonth),
+        monthsWithData,
       }
     },
     children

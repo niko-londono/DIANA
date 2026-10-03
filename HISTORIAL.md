@@ -34,10 +34,11 @@ src/
 1. **Google Sheets + Google Apps Script Web App**:
    - URL del Script: `https://script.google.com/macros/s/AKfycbz2GE95BLK0ATcberMo8zZ4dIwMwcKjPzeHXnrKQA8C5DNE_yjnVgDeW4j0xDSzfmyP/exec`
    - Hoja de cálculo: Hoja llamada `"Categorias"`.
-   - Columnas: `id`, `name`, `budgeted`, `parentId`, `canDelete`, `expanded`.
+   - Columnas: `id`, `name`, `budgeted`, `parentId`, `canDelete`, `expanded` (sin cambios; **`Code.gs` no se modificó**).
+   - **Datos por mes (v1.8.0)**: el mes viaja dentro del `id` y del `parentId` con el formato `YYYY-MM::<id>` (ej. `2026-10::gastos-m`, padre `2026-10::sueldo`). Las filas antiguas sin prefijo se asignan automáticamente al mes actual la primera vez que se carga y se reescriben ya con prefijo.
 2. **Carga Inicial (`fetchData`)**:
    - Lanza petición `GET` a `SCRIPT_URL`.
-   - Si la red responde con categorías válidas, actualiza el estado y guarda en `localStorage` (`finanzas_backup`).
+   - Si la red responde con categorías válidas, las agrupa por mes (`deserializeRows`), actualiza el estado y guarda en `localStorage` (`finanzas_backup`, formato `{ version: 2, byMonth }`; también lee el formato antiguo de arreglo plano).
    - Si falla o la hoja está vacía, realiza fallback automático a `localStorage` y finalmente a `DEFAULT_CATEGORIES`.
 3. **Persistencia Automática (`syncData`)**:
    - Al mutar cualquier categoría, guarda de inmediato en `localStorage` (cero pérdida de datos).
@@ -53,6 +54,8 @@ src/
 
 - **Metodología Base Cero**:  
   $$\text{Sueldo Base} - \text{Total Asignado (Gastos)} = \text{Diferencia ($0.00)}$$
+- **Presupuesto Independiente por Mes**:
+  El estado es `byMonth = { "2026-10": [...], "2026-11": [...] }`. Todo lo que se edita, crea, elimina o restablece afecta únicamente al mes seleccionado. Al abrir un mes por primera vez (`ENSURE_MONTH`) se crea como **copia independiente** del mes anterior más cercano con datos (si no hay, del siguiente; si no, de `DEFAULT_CATEGORIES`). Después de creado ya no se sincroniza con ningún otro mes.
 - **Prevención de Doble Conteo**:  
   Las categorías principales tienen `parentId: null`. Las subcategorías tienen `parentId: <id_padre>`.  
   El cálculo de gastos totales (`totalExpenses`) únicamente suma categorías donde `parentId === null && id !== "sueldo"`.
@@ -74,7 +77,8 @@ src/
 | :--- | :--- |
 | `DianaApp` | Componente raíz, envuelve en `BudgetProvider`, gestiona navegación y sidebar. |
 | `Sidebar` | Barra lateral con navegación, botón de colapso de escritorio y menú hamburguesa móvil. |
-| `Header` | Barra superior con logo, título, badge de sincronización y selector de mes. |
+| `Header` | Barra superior con logo, título, badge de sincronización y `MonthPicker`. |
+| `MonthPicker` | Calendario solo de meses y años (cuadrícula 3×4, flechas de año, botón "Mes actual", punto en meses con presupuesto). Cierra con Escape o clic fuera. |
 | `BudgetHero` | Cabecera con badge de balance cero/superávit/déficit, exportación CSV y botón "Nueva Categoría". |
 | `MetricCards` | Cuadrícula de 4 tarjetas: Ingreso Base, Gastos M, Viajes & Vacaciones y Fondo de Ahorro. |
 | `AllocationBar` | Barra multisegmento que visualiza el porcentaje que representa cada categoría sobre el sueldo. |
@@ -86,6 +90,16 @@ src/
 ---
 
 ## 📝 5. Historial de Cambios y Actualizaciones
+
+### [v1.8.0] — 2026-10-03 (Calendario de Mes/Año y Presupuesto por Mes)
+- **Selector de mes** (`diana-master.jsx`): el dropdown con lista fija de meses 2024/2025 fue reemplazado por el componente `MonthPicker`: calendario de solo meses y años (sin días), navegación de año con flechas (2020–2100), mes seleccionado resaltado, borde en el mes actual, punto en los meses que ya tienen presupuesto y botón "Mes actual". Nuevos iconos `ChevronLeftIcon`, `ChevronRightIcon` y `CalendarIcon`.
+- **Datos por mes** (`diana-master.js`): el estado pasó de `categories` a `byMonth`. `BudgetProvider` expone `selectedMonth`, `setSelectedMonth`, `selectedMonthLabel` y `monthsWithData`; `categories`, `totalIncome`, `totalExpenses`, etc. siempre corresponden al mes seleccionado, por lo que **ningún componente existente necesitó cambios** (incluida la página Proyección, que usa el ahorro del mes seleccionado). El `dispatch` del contexto agrega `monthKey` a cada acción automáticamente.
+- **Reducer**: nuevas acciones `LOAD_ALL` y `ENSURE_MONTH`; `RESET` ahora restablece solo el mes seleccionado (el aviso de confirmación lo indica).
+- **Sincronización**: mes codificado en `id`/`parentId` (`YYYY-MM::id`), compatible con el `Code.gs` actual. Migración automática de datos antiguos al mes actual. Respaldo local en formato `{ version: 2, byMonth }` con lectura del formato anterior.
+- **Exportación CSV**: el archivo descargado usa el mes seleccionado (`presupuesto_2026-10.csv`).
+- **Estilos** (`diana-master.css`): reemplazadas las reglas `.month-dropdown-menu` / `.month-option` por `.month-picker-*` y `.month-cell*` (sección 5); icono de calendario oculto a ≤420px; respeta `prefers-reduced-motion`.
+- `MONTHS` se conserva como export obsoleto por compatibilidad; usar `MONTH_NAMES` / `MONTH_NAMES_SHORT`.
+- Build verificado (Vite 5) y pruebas de lógica/UI del aislamiento entre meses sin errores.
 
 ### [v1.7.0] — 2026-10-03 (Subcategorías para Sueldo)
 - **Modal** (`diana-master.jsx`): Eliminada la exclusión de `sueldo` en `parentOptions` — ahora aparece en el dropdown "Categoría Padre (Opcional)".

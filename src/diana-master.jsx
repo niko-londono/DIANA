@@ -5,7 +5,7 @@
  * Este archivo consolida todos los componentes visuales de la aplicación:
  * 1. Íconos SVG vectoriales optimizados
  * 2. Barra Lateral de Navegación (Sidebar) con modo colapsable y drawer móvil
- * 3. Barra Superior (Header) con indicador de sincronización y selector de mes
+ * 3. Barra Superior (Header) con indicador de sincronización y calendario de mes/año (MonthPicker)
  * 4. Resumen Principal (BudgetHero) con badge dinámico de balance y acciones
  * 5. Cuadrícula de Tarjetas de Métricas (MetricCards)
  * 6. Barra Multisegmento de Distribución (AllocationBar)
@@ -27,7 +27,13 @@ import {
   getPercent,
   getPercentNum,
   exportBudgetToCSV,
-  MONTHS,
+  MONTH_NAMES,
+  MONTH_NAMES_SHORT,
+  MIN_YEAR,
+  MAX_YEAR,
+  getMonthKey,
+  getCurrentMonthKey,
+  parseMonthKey,
   CATEGORY_TYPES,
   ICONS_OPTIONS,
   ALLOCATION_COLOR_PALETTE,
@@ -156,6 +162,33 @@ export function ChevronDownIcon({ className = "", size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+export function ChevronLeftIcon({ className = "", size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon({ className = "", size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+export function CalendarIcon({ className = "", size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
     </svg>
   );
 }
@@ -332,10 +365,128 @@ export function Sidebar({ activePage, onNavigate }) {
 // 3. HEADER
 // ─────────────────────────────────────────────────────────────────────────────
 
+export function MonthPicker() {
+  const { selectedMonth, setSelectedMonth, monthsWithData } = useBudget();
+  const selected = parseMonthKey(selectedMonth);
+  const todayKey = getCurrentMonthKey();
+  const [isOpen, setIsOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(selected.year);
+  const wrapperRef = useRef(null);
+
+  // Cerrar al hacer clic/tocar fuera o con Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handlePointerDown = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setIsOpen(false);
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const handleToggle = () => {
+    if (!isOpen) setViewYear(selected.year); // al abrir, mostrar el año del mes activo
+    setIsOpen(!isOpen);
+  };
+
+  const handleSelect = (key) => {
+    setSelectedMonth(key);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="month-selector-wrapper" ref={wrapperRef}>
+      <button
+        className="month-selector-btn"
+        onClick={handleToggle}
+        id="month-selector-btn"
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+      >
+        <CalendarIcon size={14} className="month-cal-icon" />
+        <span className="month-text-full">{MONTH_NAMES[selected.monthIndex]} {selected.year}</span>
+        <span className="month-text-short">{MONTH_NAMES_SHORT[selected.monthIndex]} {selected.year}</span>
+        <ChevronDownIcon size={14} className={`dropdown-arrow ${isOpen ? "open" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div className="month-picker-popover" role="dialog" aria-label="Seleccionar mes y año" id="month-picker">
+          <div className="month-picker-year-row">
+            <button
+              className="month-picker-nav"
+              onClick={() => setViewYear((y) => Math.max(MIN_YEAR, y - 1))}
+              disabled={viewYear <= MIN_YEAR}
+              aria-label="Año anterior"
+              type="button"
+            >
+              <ChevronLeftIcon size={16} />
+            </button>
+            <span className="month-picker-year" aria-live="polite">{viewYear}</span>
+            <button
+              className="month-picker-nav"
+              onClick={() => setViewYear((y) => Math.min(MAX_YEAR, y + 1))}
+              disabled={viewYear >= MAX_YEAR}
+              aria-label="Año siguiente"
+              type="button"
+            >
+              <ChevronRightIcon size={16} />
+            </button>
+          </div>
+
+          <div className="month-picker-grid">
+            {MONTH_NAMES_SHORT.map((label, idx) => {
+              const key = getMonthKey(viewYear, idx);
+              const isActive = key === selectedMonth;
+              const isCurrent = key === todayKey;
+              const hasData = monthsWithData.includes(key);
+
+              return (
+                <button
+                  key={key}
+                  className={`month-cell ${isActive ? "active" : ""} ${isCurrent ? "current" : ""}`}
+                  onClick={() => handleSelect(key)}
+                  aria-label={`${MONTH_NAMES[idx]} ${viewYear}`}
+                  aria-pressed={isActive}
+                  type="button"
+                >
+                  <span>{label}</span>
+                  {hasData && <span className="month-cell-dot" aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="month-picker-footer">
+            <span className="month-picker-legend">
+              <span className="month-cell-dot" aria-hidden="true" />
+              Con presupuesto
+            </span>
+            <button
+              className="month-picker-today"
+              onClick={() => handleSelect(todayKey)}
+              disabled={selectedMonth === todayKey}
+              type="button"
+            >
+              Mes actual
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Header() {
   const { syncStatus } = useBudget();
-  const [selectedMonth, setSelectedMonth] = useState("Octubre 2024");
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   return (
     <header className="dashboard-topbar">
@@ -361,51 +512,8 @@ export function Header() {
           <CloudIcon size={16} className="sync-cloud-icon" />
         </div>
 
-        {/* Month Selector */}
-        <div className="month-selector-wrapper">
-          <button
-            className="month-selector-btn"
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            id="month-selector-btn"
-            type="button"
-          >
-            <span className="month-text-full">{selectedMonth}</span>
-            <span className="month-text-short">
-              {selectedMonth
-                .replace("Enero", "Ene")
-                .replace("Febrero", "Feb")
-                .replace("Marzo", "Mar")
-                .replace("Abril", "Abr")
-                .replace("Mayo", "May")
-                .replace("Junio", "Jun")
-                .replace("Julio", "Jul")
-                .replace("Agosto", "Ago")
-                .replace("Septiembre", "Sep")
-                .replace("Octubre", "Oct")
-                .replace("Noviembre", "Nov")
-                .replace("Diciembre", "Dic")}
-            </span>
-            <ChevronDownIcon size={14} className={`dropdown-arrow ${isDropdownOpen ? "open" : ""}`} />
-          </button>
-
-          {isDropdownOpen && (
-            <div className="month-dropdown-menu">
-              {MONTHS.map((m) => (
-                <button
-                  key={m}
-                  className={`month-option ${m === selectedMonth ? "active" : ""}`}
-                  onClick={() => {
-                    setSelectedMonth(m);
-                    setIsDropdownOpen(false);
-                  }}
-                  type="button"
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Calendario de mes y año */}
+        <MonthPicker />
       </div>
     </header>
   );
@@ -416,15 +524,15 @@ export function Header() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function BudgetHero({ onNewCategory }) {
-  const { categories, totalIncome, totalExpenses, remainingBalance, isBalanced, dispatch } = useBudget();
+  const { categories, totalIncome, totalExpenses, remainingBalance, isBalanced, dispatch, selectedMonth, selectedMonthLabel } = useBudget();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const handleExport = () => {
-    exportBudgetToCSV(categories, totalIncome, totalExpenses, remainingBalance);
+    exportBudgetToCSV(categories, totalIncome, totalExpenses, remainingBalance, selectedMonth);
   };
 
   const handleReset = () => {
-    if (window.confirm("¿Deseas restablecer los datos al presupuesto base de la plantilla?")) {
+    if (window.confirm(`¿Deseas restablecer ${selectedMonthLabel} al presupuesto base de la plantilla? Los demás meses no se modifican.`)) {
       dispatch({ type: "RESET" });
       setShowMoreMenu(false);
     }
