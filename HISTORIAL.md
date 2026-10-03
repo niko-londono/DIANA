@@ -87,6 +87,19 @@ src/
 
 ## 📝 5. Historial de Cambios y Actualizaciones
 
+### [v1.6.0] — 2026-10-03 (CSS de la Página Proyección de Metas)
+- Añadida la **sección 14** completa de estilos en [`src/diana-master.css`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/src/diana-master.css) para `GoalProjectionPage`:
+  - `.projection-container`, `.projection-hero-header` con gradiente oscuro y radial glow.
+  - `.projection-pill-tag`, `.projection-hero-title/subtitle/desc`, `.preset-btn` con estados hover/active.
+  - `.projection-alert` con variantes `alert-deficit` (rojo) y `alert-surplus` (verde).
+  - `.projection-card`, `.projection-card-header`, `.card-header-icon-box` con variantes `bg-indigo` y `bg-cyan`.
+  - Formulario: `.goal-form-grid`, `.goal-input`, `.input-currency-wrapper`, `.quick-chip` con estado active verde.
+  - KPI Grid: `.results-kpi-grid`, `.result-kpi-card`, `.featured-emerald` (span 3 destacada oscura).
+  - Tabla de compatibilidad: `.compat-table`, `.diff-pill-badge` con variantes `diff-zero` y `diff-warn`.
+  - Tabla cronograma: `.schedule-table`, `.schedule-row.milestone-row`, `.schedule-progress-bar`, `.milestone-badge`.
+  - Responsive completo: breakpoints `900px` y `600px`.
+- Build verificado: 866ms, sin errores.
+
 ### [v1.5.0] — 2026-10-01 (Unificación en 3 Archivos Maestros y Creación de HISTORIAL.md)
 - **Consolidación de Arquitectura**:
   - Creado [`src/diana-master.jsx`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/src/diana-master.jsx) conteniendo toda la UI y componentes.
