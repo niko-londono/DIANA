@@ -746,60 +746,171 @@ export function BudgetTable({ onEditCategory }) {
             </tr>
           </thead>
           <tbody>
-            {/* Fila 1: Sueldo */}
-            {showSueldo && (
-              <tr className="table-row row-sueldo" id="row-sueldo">
-                <td>
-                  <div className="category-cell-content">
-                    <div className="cat-icon-container bg-emerald-light text-emerald">
-                      <CategoryIcon name="cash" size={18} />
-                    </div>
-                    <div className="cat-text-container">
-                      <span className="cat-main-name">{sueldoCat.name}</span>
-                      <span className="cat-subtext-desc">{sueldoCat.subtext || "Ingreso recurrente de nómina"}</span>
-                      <div className="cat-mobile-meta">
-                        <span className="type-badge badge-income">Ingreso Base</span>
-                        <span className="cat-mobile-pct">100%</span>
+            {/* Fila 1: Sueldo (ahora soporta subcategorías) */}
+            {(() => {
+              const sueldoChildren = getChildren(sueldoCat.id || "sueldo");
+              const sueldoHasChildren = sueldoChildren.length > 0;
+              const sueldoDiff = getCategoryDiff(sueldoCat, categories);
+              return showSueldo && (
+                <Fragment key="sueldo-block">
+                  <tr className={`table-row row-sueldo ${sueldoHasChildren ? "has-children" : ""}`} id="row-sueldo">
+                    <td>
+                      <div className="category-cell-content">
+                        <div className="cat-icon-container bg-emerald-light text-emerald">
+                          <CategoryIcon name="cash" size={18} />
+                        </div>
+                        <div className="cat-text-container">
+                          <div className="cat-name-wrapper">
+                            {sueldoHasChildren && (
+                              <button
+                                className={`collapse-toggle-btn ${sueldoCat.expanded ? "expanded" : ""}`}
+                                onClick={() => handleToggle(sueldoCat.id || "sueldo")}
+                                type="button"
+                                title={sueldoCat.expanded ? "Contraer subcategorías" : "Desplegar subcategorías"}
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+                                  <polyline points={sueldoCat.expanded ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+                                </svg>
+                              </button>
+                            )}
+                            <span
+                              className={`cat-main-name ${sueldoHasChildren ? "clickable-parent-name" : ""}`}
+                              onClick={sueldoHasChildren ? () => handleToggle(sueldoCat.id || "sueldo") : undefined}
+                            >
+                              {sueldoCat.name}
+                            </span>
+                          </div>
+                          <span className="cat-subtext-desc">{sueldoCat.subtext || "Ingreso recurrente de nómina"}</span>
+                          <div className="cat-mobile-meta">
+                            <span className="type-badge badge-income">Ingreso Base</span>
+                            <span className="cat-mobile-pct">100%</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="col-desktop-only">
-                  <span className="type-badge badge-income">Ingreso Base</span>
-                </td>
-                <td className="cell-budgeted">
-                  <div className="budgeted-cell-inner">
-                    <strong>{formatCurrency(sueldoCat.budgeted)}</strong>
-                    <span className="diff-pill-badge diff-zero diff-pill-mobile">
-                      <CheckIcon size={10} /> $0.00
-                    </span>
-                  </div>
-                </td>
-                <td className="col-desktop-only">
-                  <div className="proportion-cell">
-                    <div className="bar-track">
-                      <div className="bar-fill fill-emerald" style={{ width: "100%" }} />
-                    </div>
-                    <span className="proportion-text">100%</span>
-                  </div>
-                </td>
-                <td className="cell-difference col-desktop-only">
-                  <span className="diff-pill-badge diff-zero">
-                    <CheckIcon size={12} /> $0.00
-                  </span>
-                </td>
-                <td className="cell-actions">
-                  <button
-                    className="action-btn-icon edit"
-                    onClick={() => onEditCategory(sueldoCat)}
-                    title="Editar Sueldo"
-                    type="button"
-                  >
-                    <EditIcon size={15} />
-                  </button>
-                </td>
-              </tr>
-            )}
+                    </td>
+                    <td className="col-desktop-only">
+                      <span className="type-badge badge-income">Ingreso Base</span>
+                    </td>
+                    <td className="cell-budgeted">
+                      <div className="budgeted-cell-inner">
+                        <strong>{formatCurrency(sueldoCat.budgeted)}</strong>
+                        {sueldoHasChildren ? (
+                          <span className={`diff-pill-badge diff-pill-mobile ${sueldoDiff.isZero ? "diff-zero" : "diff-warn"}`}>
+                            {sueldoDiff.display}
+                          </span>
+                        ) : (
+                          <span className="diff-pill-badge diff-zero diff-pill-mobile">
+                            <CheckIcon size={10} /> $0.00
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="col-desktop-only">
+                      <div className="proportion-cell">
+                        <div className="bar-track">
+                          <div className="bar-fill fill-emerald" style={{ width: "100%" }} />
+                        </div>
+                        <span className="proportion-text">100%</span>
+                      </div>
+                    </td>
+                    <td className="cell-difference col-desktop-only">
+                      {sueldoHasChildren ? (
+                        <span className={`diff-pill-badge ${sueldoDiff.isZero ? "diff-zero" : "diff-warn"}`}>
+                          {sueldoDiff.display}
+                        </span>
+                      ) : (
+                        <span className="diff-pill-badge diff-zero">
+                          <CheckIcon size={12} /> $0.00
+                        </span>
+                      )}
+                    </td>
+                    <td className="cell-actions">
+                      <button
+                        className="action-btn-icon edit"
+                        onClick={() => onEditCategory(sueldoCat)}
+                        title="Editar Sueldo"
+                        type="button"
+                      >
+                        <EditIcon size={15} />
+                      </button>
+                    </td>
+                  </tr>
+
+                  {/* Subcategorías de Sueldo (quincenas, ingresos extra, etc.) */}
+                  {sueldoCat.expanded && sueldoChildren.map((child) => {
+                    const childPercentStr = getPercent(child.budgeted, totalIncome);
+                    const childPercentNum = getPercentNum(child.budgeted, totalIncome);
+                    return (
+                      <tr key={child.id} className="table-row subcategory-row" id={`row-${child.id}`}>
+                        <td>
+                          <div className="category-cell-content subcat-cell-content">
+                            <div className="subcat-indent-space" />
+                            <div className="cat-text-container">
+                              <span className="subcat-main-name">{child.name}</span>
+                              {child.subtext && (
+                                <span className="cat-subtext-desc">{child.subtext}</span>
+                              )}
+                              <div className="cat-mobile-meta">
+                                <span className="type-badge badge-subcat">
+                                  {child.type || "Ingreso Adicional"}
+                                </span>
+                                <span className="cat-mobile-pct">{childPercentStr}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="col-desktop-only">
+                          <span className="type-badge badge-subcat">
+                            {child.type || "Ingreso Adicional"}
+                          </span>
+                        </td>
+                        <td className="cell-budgeted">
+                          <div className="budgeted-cell-inner">
+                            <span className="subcat-budgeted-amount">
+                              {formatCurrency(child.budgeted)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="col-desktop-only">
+                          <div className="proportion-cell">
+                            <div className="bar-track subcat-track">
+                              <div
+                                className="bar-fill fill-emerald"
+                                style={{ width: `${childPercentNum}%`, opacity: 0.75 }}
+                              />
+                            </div>
+                            <span className="proportion-text subcat-pct">{childPercentStr}</span>
+                          </div>
+                        </td>
+                        <td className="cell-difference col-desktop-only">
+                          <span className="diff-dash">-</span>
+                        </td>
+                        <td className="cell-actions">
+                          <button
+                            className="action-btn-icon edit"
+                            onClick={() => onEditCategory(child)}
+                            title="Editar subcategoría"
+                            type="button"
+                          >
+                            <EditIcon size={14} />
+                          </button>
+                          {child.canDelete !== false && (
+                            <button
+                              className="action-btn-icon delete"
+                              onClick={() => handleDelete(child.id, child.name)}
+                              title="Eliminar subcategoría"
+                              type="button"
+                            >
+                              <TrashIcon size={14} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </Fragment>
+              );
+            })()}
 
             {/* Filas de Categorías de Gastos */}
             {filteredParents.map((cat) => {
@@ -1094,7 +1205,7 @@ export function AddCategoryModal({ isOpen, onClose, categoryToEdit = null }) {
   const isEditing = Boolean(categoryToEdit);
 
   const parentOptions = categories.filter(
-    (c) => c.parentId === null && c.id !== "sueldo" && (!categoryToEdit || c.id !== categoryToEdit.id)
+    (c) => c.parentId === null && (!categoryToEdit || c.id !== categoryToEdit.id)
   );
 
   useEffect(() => {

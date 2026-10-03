@@ -87,6 +87,16 @@ src/
 
 ## 📝 5. Historial de Cambios y Actualizaciones
 
+### [v1.7.0] — 2026-10-03 (Subcategorías para Sueldo)
+- **Modal** (`diana-master.jsx`): Eliminada la exclusión de `sueldo` en `parentOptions` — ahora aparece en el dropdown "Categoría Padre (Opcional)".
+- **Tabla BudgetTable** (`diana-master.jsx`): La fila de Sueldo fue reemplazada por lógica dinámica que:
+  - Muestra botón chevron de expand/collapse si hay subcategorías.
+  - Despliega las subcategorías de Sueldo con sangría `└` y badge esmeralda igual que los demás padres.
+  - Muestra el badge de diferencia (cuadre/déficit) cuando tiene hijos.
+  - Permite editar y eliminar subcategorías de Sueldo individualmente.
+- **Lógica preservada**: `totalIncome` sigue usando solo el valor del Sueldo padre; las subcategorías (quincenas, ingresos extra) son solo visuales/organizativas y no afectan el balance cero.
+- Build verificado: 837ms, sin errores.
+
 ### [v1.6.0] — 2026-10-03 (CSS de la Página Proyección de Metas)
 - Añadida la **sección 14** completa de estilos en [`src/diana-master.css`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/src/diana-master.css) para `GoalProjectionPage`:
   - `.projection-container`, `.projection-hero-header` con gradiente oscuro y radial glow.
