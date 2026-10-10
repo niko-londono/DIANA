@@ -87,11 +87,26 @@ src/
 | `BudgetTable` | Tabla completa con buscador, desglose por categorías, subcategorías y fila de Sueldo Cuadre. |
 | `AddCategoryModal` | Modal reutilizable para crear y editar categorías o subcategorías. |
 | `PlaceholderPage` | Vistas en construcción para las pestañas de navegación secundaria. |
+| `DistributionPage` | Pestaña Distribución: gráfica de barras apiladas por mes (ganancia + reparto por categoría), vista $ / %, KPIs del año, detalle del mes y tabla resumen. |
 | `Icons` | Colección completa de iconos vectoriales en SVG (Cash, Home, Plane, Vault, etc.). |
 
 ---
 
 ## 📝 5. Historial de Cambios y Actualizaciones
+
+### [v1.10.0] — 2026-10-10 (Distribución: ganancia por mes y reparto mensual)
+- **Nueva pestaña Distribución** (`diana-master.jsx`, `DistributionPage`): reemplaza el placeholder "Próximamente".
+  - **Gráfica de barras apiladas, 12 meses del año**: la altura de cada barra es la ganancia del mes (Sueldo + categorías "Ingreso Base") y cada color es una categoría principal de gasto. Si el mes tiene superávit, la parte sin asignar se dibuja rayada; si tiene déficit, un marcador oscuro indica el nivel de la ganancia.
+  - **Interruptor "$ Monto" / "% Distribución"**: en % todas las barras se normalizan al 100% para comparar cómo se repartió cada mes.
+  - **Selector de año** (flechas en el hero, 2020–2100). Sigue al año que se elija en el calendario del encabezado.
+  - **KPIs del año**: ganancia total, promedio mensual, mejor mes y total asignado.
+  - **Panel "Detalle de <mes>"** (se cambia tocando una barra o una fila): ganancia, monto y % por categoría, total asignado y diferencia con badge BALANCE CERO / SUPERÁVIT / DÉFICIT.
+  - **Tabla "Resumen por mes"** con monto y % por categoría, fila de total del año y primera columna fija en móvil.
+  - **Meses futuros** (posteriores al mes actual) se muestran atenuados como "Proyectado" y **no suman** a totales, promedio ni mejor mes. Motivo: abrir un mes futuro en el calendario crea una copia del mes anterior (`ENSURE_MONTH`) y distorsionaría las ganancias reales.
+- **Lógica** (`diana-master.js`, sección 6B): nuevas `getMonthSummary`, `buildYearDistribution`, `formatCompactCurrency` y `DISTRIBUTION_COLORS`. Las categorías se identifican por `id`, así que conservan el mismo color en todos los meses. El contexto ahora también expone `byMonth` (el resto de valores sigue siendo del mes seleccionado).
+- **Estilos** (`diana-master.css`, sección 15): clases `.dist-*`, reutilizando el hero y las tarjetas de Proyección (`.projection-hero-header`, `.projection-card`). Responsive a 1100px, 900px y 600px (en móvil el valor sobre la barra solo se muestra en el mes activo) y respeta `prefers-reduced-motion`.
+- **Sin cambios** en `Code.gs`, el formato de Google Sheets ni el respaldo local.
+- Verificado con Vite 5 (build sin errores) y 9 pruebas (lógica de agrupación, totales, meses futuros, año vacío, clic en barras, modo %, navegación de año).
 
 ### [v1.9.0] — 2026-10-03 (Ingresos Extra suman al Ingreso)
 - **Lógica** (`diana-master.js`): nueva función `isIncomeCategory`. `totalIncome` ahora suma el Sueldo y toda categoría principal de tipo "Ingreso Base"; `totalExpenses` las excluye. `getCategoryMeta` trata el tipo "Ingreso Base" con estilo de ingreso (badge verde, ícono de efectivo, descripción "Ingreso adicional que se suma al sueldo").

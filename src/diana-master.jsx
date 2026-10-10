@@ -13,6 +13,7 @@
  * 8. Ventana Modal de Creación / Edición (AddCategoryModal)
  * 9. Páginas Auxiliares (PlaceholderPage)
  * 10. Vista Principal (Overview) y Componente Raíz de la Aplicación (DianaApp)
+ * 11. Distribución por mes (DistributionPage): ganancia mensual y reparto por categoría
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
@@ -42,7 +43,9 @@ import {
   NAV_ITEMS,
   calculateGoalProjection,
   DEFAULT_GOAL,
-  GOAL_STORAGE_KEY
+  GOAL_STORAGE_KEY,
+  buildYearDistribution,
+  formatCompactCurrency
 } from "./diana-master.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2108,6 +2111,440 @@ export function GoalProjectionPage() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 10B. DISTRIBUCIÓN POR MES (DISTRIBUTIONPAGE)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Redondea hacia arriba a un valor "bonito" para el eje Y (17,000 -> 20,000) */
+function niceCeil(value) {
+  if (!(value > 0)) return 1;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+  const normalized = value / magnitude;
+  const step = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((x) => normalized <= x);
+  return step * magnitude;
+}
+
+function getBalanceStatus(balance) {
+  if (balance === 0) return { label: "BALANCE CERO", cls: "dist-status-zero" };
+  if (balance > 0) return { label: "SUPERÁVIT", cls: "dist-status-surplus" };
+  return { label: "DÉFICIT", cls: "dist-status-deficit" };
+}
+
+function getDiffClass(balance) {
+  if (balance === 0) return "dist-diff-zero";
+  return balance > 0 ? "dist-diff-surplus" : "dist-diff-deficit";
+}
+
+export function DistributionPage() {
+  const { byMonth, selectedMonth } = useBudget();
+  const selectedYear = parseMonthKey(selectedMonth).year;
+
+  const [year, setYear] = useState(selectedYear);
+  const [mode, setMode] = useState("amount"); // "amount" ($) | "percent" (% del ingreso)
+  const [activeKey, setActiveKey] = useState(null);
+
+  // Si cambia el año desde el calendario del encabezado, la página lo sigue
+  useEffect(() => {
+    setYear(selectedYear);
+  }, [selectedYear]);
+
+  const data = useMemo(() => buildYearDistribution(byMonth, year), [byMonth, year]);
+  const isPercent = mode === "percent";
+
+  const catById = useMemo(() => {
+    const map = {};
+    data.categories.forEach((c) => { map[c.id] = c; });
+    return map;
+  }, [data.categories]);
+
+  // Mes que se muestra en el panel de detalle
+  const activeMonth = useMemo(() => {
+    const picked = data.months.find((m) => m.key === activeKey && m.hasData);
+    if (picked) return picked;
+    const current = data.months.find((m) => m.key === selectedMonth && m.hasData);
+    if (current) return current;
+    const withData = data.months.filter((m) => m.hasData);
+    return withData.length > 0 ? withData[withData.length - 1] : null;
+  }, [data.months, activeKey, selectedMonth]);
+
+  const maxValue = Math.max(0, ...data.months.map((m) => Math.max(m.income, m.expenses)));
+  const niceMax = niceCeil(maxValue);
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+
+  const hasSurplus = data.months.some((m) => m.hasData && m.balance > 0);
+  const hasDeficit = data.months.some((m) => m.hasData && m.balance < 0);
+
+  const totalDiff = data.totalIncome - data.totalExpenses;
+
+  return (
+    <div className="projection-container" id="distribucion-view">
+      <Header />
+
+      {/* Cabecera */}
+      <div className="projection-hero-header">
+        <div className="projection-hero-top">
+          <div className="projection-hero-titles">
+            <span className="projection-pill-tag">PLANIFICADOR FINANCIERO</span>
+            <h1 className="projection-hero-title">Distribución</h1>
+            <h2 className="projection-hero-subtitle">Ganancias y distribución mes a mes</h2>
+          </div>
+
+          <div className="dist-year-nav" role="group" aria-label="Año">
+            <button
+              type="button"
+              className="dist-year-btn"
+              onClick={() => setYear((y) => Math.max(MIN_YEAR, y - 1))}
+              disabled={year <= MIN_YEAR}
+              aria-label="Año anterior"
+            >
+              <ChevronLeftIcon size={16} />
+            </button>
+            <span className="dist-year-value">{year}</span>
+            <button
+              type="button"
+              className="dist-year-btn"
+              onClick={() => setYear((y) => Math.min(MAX_YEAR, y + 1))}
+              disabled={year >= MAX_YEAR}
+              aria-label="Año siguiente"
+            >
+              <ChevronRightIcon size={16} />
+            </button>
+          </div>
+        </div>
+        <p className="projection-hero-desc">
+          Cada barra es la ganancia de un mes y sus colores muestran cómo la repartiste entre tus categorías.
+        </p>
+      </div>
+
+      {/* Indicadores del año */}
+      <div className="dist-kpi-grid">
+        <div className="dist-kpi dist-kpi-featured">
+          <span className="dist-kpi-label">GANANCIA TOTAL {year}</span>
+          <strong className="dist-kpi-value">{formatCurrency(data.totalIncome)}</strong>
+          <span className="dist-kpi-sub">
+            {data.countedCount} {data.countedCount === 1 ? "mes registrado" : "meses registrados"}
+          </span>
+        </div>
+        <div className="dist-kpi">
+          <span className="dist-kpi-label">PROMEDIO MENSUAL</span>
+          <strong className="dist-kpi-value">{formatCurrency(data.avgIncome)}</strong>
+          <span className="dist-kpi-sub">por mes con datos</span>
+        </div>
+        <div className="dist-kpi">
+          <span className="dist-kpi-label">MEJOR MES</span>
+          <strong className="dist-kpi-value">
+            {data.bestMonth ? MONTH_NAMES[data.bestMonth.monthIndex] : "—"}
+          </strong>
+          <span className="dist-kpi-sub">
+            {data.bestMonth ? formatCurrency(data.bestMonth.income) : "Sin datos"}
+          </span>
+        </div>
+        <div className="dist-kpi">
+          <span className="dist-kpi-label">TOTAL ASIGNADO</span>
+          <strong className="dist-kpi-value">{formatCurrency(data.totalExpenses)}</strong>
+          <span className="dist-kpi-sub">{getPercent(data.totalExpenses, data.totalIncome)} de la ganancia</span>
+        </div>
+      </div>
+
+      {/* Gráfica principal */}
+      <section className="projection-card dist-card" id="distribution-chart-card">
+        <div className="projection-card-header dist-card-header">
+          <div className="card-header-icon-box bg-indigo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="6" y1="20" x2="6" y2="11" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="18" y1="20" x2="18" y2="14" />
+            </svg>
+          </div>
+          <div className="dist-card-heading">
+            <h3 className="projection-card-title">Ganancia por mes</h3>
+            <p className="projection-card-subtitle">
+              {isPercent
+                ? "Cómo se repartió la ganancia de cada mes (% del ingreso)"
+                : "Ganancia de cada mes y cómo se distribuyó entre tus categorías"}
+            </p>
+          </div>
+          <div className="dist-toggle" role="group" aria-label="Tipo de vista">
+            <button
+              type="button"
+              className={`dist-toggle-btn${!isPercent ? " active" : ""}`}
+              onClick={() => setMode("amount")}
+              aria-pressed={!isPercent}
+            >
+              $ Monto
+            </button>
+            <button
+              type="button"
+              className={`dist-toggle-btn${isPercent ? " active" : ""}`}
+              onClick={() => setMode("percent")}
+              aria-pressed={isPercent}
+            >
+              % Distribución
+            </button>
+          </div>
+        </div>
+
+        {data.dataCount === 0 ? (
+          <div className="dist-empty">
+            <strong>Aún no hay presupuestos en {year}</strong>
+            <span>Registra un mes desde Overview o cambia de año con las flechas de arriba.</span>
+          </div>
+        ) : (
+          <div className="dist-card-body">
+            <div className="dist-legend">
+              {data.categories.map((cat) => (
+                <span className="dist-legend-item" key={cat.id}>
+                  <span className="dist-dot" style={{ background: cat.color }} />
+                  {cat.name}
+                </span>
+              ))}
+              {hasSurplus && (
+                <span className="dist-legend-item">
+                  <span className="dist-dot dist-dot-surplus" />
+                  Sin asignar
+                </span>
+              )}
+              {hasDeficit && (
+                <span className="dist-legend-item">
+                  <span className="dist-dot dist-dot-marker" />
+                  Ganancia (mes en déficit)
+                </span>
+              )}
+            </div>
+
+            <div className="dist-chart">
+              <div className="dist-plot">
+                {ticks.map((t) => (
+                  <div className="dist-grid-line" style={{ bottom: `${t * 100}%` }} key={t}>
+                    <span className="dist-grid-label">
+                      {isPercent ? `${Math.round(t * 100)}%` : formatCompactCurrency(niceMax * t)}
+                    </span>
+                  </div>
+                ))}
+
+                <div className="dist-columns">
+                  {data.months.map((m) => {
+                    const barTotal = Math.max(m.income, m.expenses);
+                    const base = isPercent ? barTotal : niceMax;
+                    const stackPct = base > 0 ? (barTotal / base) * 100 : 0;
+                    const markerPct = base > 0 ? (m.income / base) * 100 : 0;
+                    const surplus = Math.max(0, m.income - m.expenses);
+                    const isActive = activeMonth && activeMonth.key === m.key;
+                    const ordered = data.categories
+                      .map((cat) => m.items.find((it) => it.id === cat.id))
+                      .filter((it) => it && it.amount > 0);
+                    const projected = m.hasData && m.isFuture;
+                    const label = `${MONTH_NAMES[m.monthIndex]} ${year}${projected ? " (proyectado)" : ""}`;
+
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        className={[
+                          "dist-col",
+                          m.hasData ? "" : "is-empty",
+                          projected ? "is-future" : "",
+                          isActive ? "is-active" : ""
+                        ].join(" ").trim()}
+                        disabled={!m.hasData}
+                        onClick={() => setActiveKey(m.key)}
+                        title={m.hasData ? `${label}: ganancia ${formatCurrency(m.income)}` : `${label}: sin datos`}
+                        aria-label={m.hasData ? `${label}, ganancia ${formatCurrency(m.income)}` : `${label}, sin datos`}
+                        aria-pressed={!!isActive}
+                      >
+                        {m.hasData && barTotal > 0 && (
+                          <>
+                            <span className="dist-col-value" style={{ bottom: `calc(${stackPct}% + 6px)` }}>
+                              {formatCompactCurrency(m.income)}
+                            </span>
+                            <span className="dist-stack" style={{ height: `${stackPct}%` }}>
+                              {ordered.map((it) => (
+                                <span
+                                  key={it.id}
+                                  className="dist-seg"
+                                  style={{ flexGrow: it.amount, background: catById[it.id] ? catById[it.id].color : "#94a3b8" }}
+                                />
+                              ))}
+                              {surplus > 0 && (
+                                <span className="dist-seg dist-seg-surplus" style={{ flexGrow: surplus }} />
+                              )}
+                            </span>
+                            {m.balance < 0 && (
+                              <span className="dist-income-marker" style={{ bottom: `${markerPct}%` }} />
+                            )}
+                          </>
+                        )}
+                        <span className="dist-col-label">{MONTH_NAMES_SHORT[m.monthIndex]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Detalle del mes seleccionado en la gráfica */}
+      {activeMonth && (() => {
+        const status = getBalanceStatus(activeMonth.balance);
+        return (
+          <section className="projection-card dist-card" id="distribution-detail-card">
+            <div className="projection-card-header dist-card-header">
+              <div className="card-header-icon-box">
+                <CashIcon size={20} />
+              </div>
+              <div className="dist-card-heading">
+                <h3 className="projection-card-title">
+                  Detalle de {MONTH_NAMES[activeMonth.monthIndex]} {year}
+                  {activeMonth.isFuture && <span className="dist-tag-future">Proyectado</span>}
+                </h3>
+                <p className="projection-card-subtitle">Toca otra barra de la gráfica para ver otro mes</p>
+              </div>
+              <span className={`dist-status ${status.cls}`}>{status.label}</span>
+            </div>
+
+            <div className="dist-detail-body">
+              <div className="dist-detail-income">
+                <span>Ganancia del mes</span>
+                <strong>{formatCurrency(activeMonth.income)}</strong>
+              </div>
+
+              <ul className="dist-detail-list">
+                {data.categories.map((cat) => {
+                  const it = activeMonth.items.find((x) => x.id === cat.id);
+                  if (!it) return null;
+                  return (
+                    <li className="dist-detail-row" key={cat.id}>
+                      <div className="dist-detail-row-top">
+                        <span className="dist-detail-name">
+                          <span className="dist-dot" style={{ background: cat.color }} />
+                          {cat.name}
+                        </span>
+                        <span className="dist-detail-amount">
+                          {formatCurrency(it.amount)}
+                          <small>{getPercent(it.amount, activeMonth.income)}</small>
+                        </span>
+                      </div>
+                      <div className="dist-detail-track">
+                        <div
+                          className="dist-detail-fill"
+                          style={{ width: `${getPercentNum(it.amount, activeMonth.income)}%`, background: cat.color }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <div className="dist-detail-foot">
+                <span>Total asignado: <strong>{formatCurrency(activeMonth.expenses)}</strong></span>
+                <span>
+                  Diferencia:{" "}
+                  <strong className={`dist-diff ${getDiffClass(activeMonth.balance)}`}>
+                    {formatCurrency(activeMonth.balance)}
+                  </strong>
+                </span>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
+
+      {/* Tabla resumen por mes */}
+      {data.dataCount > 0 && (
+        <section className="projection-card dist-card" id="distribution-table-card">
+          <div className="projection-card-header dist-card-header">
+            <div className="card-header-icon-box bg-cyan">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="3" y1="15" x2="21" y2="15" />
+                <line x1="9" y1="3" x2="9" y2="21" />
+              </svg>
+            </div>
+            <div className="dist-card-heading">
+              <h3 className="projection-card-title">Resumen por mes</h3>
+              <p className="projection-card-subtitle">Ganancia y monto asignado a cada categoría en {year}</p>
+            </div>
+          </div>
+
+          <div className="dist-table-scroll">
+            <table className="dist-table">
+              <thead>
+                <tr>
+                  <th>Mes</th>
+                  <th className="num">Ganancia</th>
+                  {data.categories.map((cat) => (
+                    <th className="num" key={cat.id}>
+                      <span className="dist-dot" style={{ background: cat.color }} />
+                      {cat.name}
+                    </th>
+                  ))}
+                  <th className="num">Diferencia</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.months.filter((m) => m.hasData).map((m) => (
+                  <tr
+                    key={m.key}
+                    className={`${activeMonth && activeMonth.key === m.key ? "is-active" : ""}${m.isFuture ? " is-future" : ""}`}
+                    onClick={() => setActiveKey(m.key)}
+                  >
+                    <td className="dist-cell-month">
+                      {MONTH_NAMES[m.monthIndex]}
+                      {m.isFuture && <span className="dist-tag-future">Proyectado</span>}
+                    </td>
+                    <td className="num"><strong>{formatCurrency(m.income)}</strong></td>
+                    {data.categories.map((cat) => {
+                      const it = m.items.find((x) => x.id === cat.id);
+                      return (
+                        <td className="num" key={cat.id}>
+                          {it ? (
+                            <>
+                              <span>{formatCurrency(it.amount)}</span>
+                              <small>{getPercent(it.amount, m.income)}</small>
+                            </>
+                          ) : (
+                            <span className="dist-cell-none">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="num">
+                      <span className={`dist-diff ${getDiffClass(m.balance)}`}>{formatCurrency(m.balance)}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>Total {year}</td>
+                  <td className="num">{formatCurrency(data.totalIncome)}</td>
+                  {data.categories.map((cat) => (
+                    <td className="num" key={cat.id}>
+                      <span>{formatCurrency(data.totalsByCategory[cat.id] || 0)}</span>
+                      <small>{getPercent(data.totalsByCategory[cat.id] || 0, data.totalIncome)}</small>
+                    </td>
+                  ))}
+                  <td className="num">{formatCurrency(totalDiff)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {data.hasFuture && (
+            <p className="dist-footnote">
+              Los meses marcados como “Proyectado” todavía no han transcurrido: se muestran en la gráfica,
+              pero no suman a los totales ni al promedio.
+            </p>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 11. COMPONENTE RAÍZ DE LA APLICACIÓN (DIANAAPP)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2115,7 +2552,7 @@ const PAGES = {
   overview: <Overview />,
   proyeccion: <GoalProjectionPage />,
   summary: <GoalProjectionPage />, // retrocompatibilidad con enlaces anteriores
-  distribution: <PlaceholderPage title="Distribución" description="Visualiza cómo se distribuye tu presupuesto por categorías." />,
+  distribution: <DistributionPage />,
   cards: <PlaceholderPage title="Tarjetas" description="Administra tus tarjetas de crédito y débito." />,
   settings: <PlaceholderPage title="Settings" description="Configura las preferencias de tu presupuesto." />,
   notes: <PlaceholderPage title="Notes" description="Notas y recordatorios financieros personales." />,

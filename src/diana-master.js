@@ -591,6 +591,106 @@ function writeLocalBackup(byMonth) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 6B. DISTRIBUCIÓN POR MES (página Distribución)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// La "ganancia" de un mes es su ingreso total (Sueldo + categorías "Ingreso Base").
+// La "distribución" es cómo se repartió ese ingreso entre las categorías principales de gasto.
+
+export const DISTRIBUTION_COLORS = [
+  "#6366f1", "#06b6d4", "#a855f7", "#f59e0b", "#ec4899",
+  "#3b82f6", "#f97316", "#14b8a6", "#84cc16", "#f43f5e"
+];
+
+/** Moneda compacta para ejes de gráficas: 17000 -> "$17k", 1250000 -> "$1.25M" */
+export function formatCompactCurrency(value) {
+  const num = Number(value) || 0;
+  const abs = Math.abs(num);
+  const trim = (n, d) => String(Number(n.toFixed(d)));
+  if (abs >= 1000000) return "$" + trim(num / 1000000, 2) + "M";
+  if (abs >= 1000) return "$" + trim(num / 1000, 1) + "k";
+  return "$" + trim(num, 0);
+}
+
+/** Resumen de un mes: ingreso, gasto asignado, balance y monto por categoría principal */
+export function getMonthSummary(categories) {
+  const list = Array.isArray(categories) ? categories : [];
+  const income = list
+    .filter(isIncomeCategory)
+    .reduce((sum, c) => sum + (Number(c.budgeted) || 0), 0);
+  const items = list
+    .filter((c) => !c.parentId && !isIncomeCategory(c))
+    .map((c) => ({ id: c.id, name: c.name, amount: Number(c.budgeted) || 0 }));
+  const expenses = items.reduce((sum, it) => sum + it.amount, 0);
+  return { income, expenses, balance: income - expenses, items };
+}
+
+/**
+ * Arma los 12 meses de un año con su ganancia y distribución.
+ * - Los meses futuros (posteriores al mes actual) son "proyectados" y no suman a los totales.
+ * - Cada categoría conserva el mismo color en todos los meses (se identifica por su id).
+ */
+export function buildYearDistribution(byMonth, year) {
+  const source = byMonth || {};
+  const currentKey = getCurrentMonthKey();
+  const catMap = new Map();
+  const months = [];
+
+  for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+    const key = getMonthKey(year, monthIndex);
+    const cats = source[key];
+    const hasData = Array.isArray(cats) && cats.length > 0;
+    const summary = hasData
+      ? getMonthSummary(cats)
+      : { income: 0, expenses: 0, balance: 0, items: [] };
+
+    summary.items.forEach((it) => {
+      const known = catMap.get(it.id);
+      if (known) {
+        known.name = it.name;
+      } else {
+        catMap.set(it.id, {
+          id: it.id,
+          name: it.name,
+          color: DISTRIBUTION_COLORS[catMap.size % DISTRIBUTION_COLORS.length]
+        });
+      }
+    });
+
+    months.push({ key, monthIndex, hasData, isFuture: key > currentKey, ...summary });
+  }
+
+  const categories = Array.from(catMap.values());
+  const counted = months.filter((m) => m.hasData && !m.isFuture);
+
+  const totalIncome = counted.reduce((sum, m) => sum + m.income, 0);
+  const totalExpenses = counted.reduce((sum, m) => sum + m.expenses, 0);
+  const avgIncome = counted.length > 0 ? totalIncome / counted.length : 0;
+  const bestMonth = counted.reduce((best, m) => (!best || m.income > best.income ? m : best), null);
+
+  const totalsByCategory = {};
+  categories.forEach((cat) => {
+    totalsByCategory[cat.id] = counted.reduce((sum, m) => {
+      const it = m.items.find((x) => x.id === cat.id);
+      return sum + (it ? it.amount : 0);
+    }, 0);
+  });
+
+  return {
+    months,
+    categories,
+    totalIncome,
+    totalExpenses,
+    avgIncome,
+    bestMonth,
+    countedCount: counted.length,
+    dataCount: months.filter((m) => m.hasData).length,
+    hasFuture: months.some((m) => m.hasData && m.isFuture),
+    totalsByCategory
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 7. REDUCER DEL PRESUPUESTO (POR MES)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -824,6 +924,7 @@ export function BudgetProvider({ children }) {
         setSelectedMonth,
         selectedMonthLabel: formatMonthLabel(selectedMonth),
         monthsWithData,
+        byMonth: state.byMonth,
       }
     },
     children
