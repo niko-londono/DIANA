@@ -691,6 +691,208 @@ export function buildYearDistribution(byMonth, year) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 6C. TARJETAS DE CRÉDITO POR MES (página Tarjetas)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Igual que el presupuesto, las tarjetas son independientes por mes:
+//   cardsByMonth = { "2026-10": [ { id, name, cutDay, dueDay, paid, paidAt } ], ... }
+// - cutDay / dueDay son el día del mes (1-31) de la fecha de corte y de vencimiento DE ESE MES.
+//   Si el mes es más corto (ej. día 31 en febrero) se usa el último día del mes.
+// - Al abrir un mes que aún no tiene tarjetas se crea como copia del mes anterior más cercano,
+//   con todas las tarjetas SIN pagar. Después ya no se sincroniza con ningún otro mes.
+// - Se guardan en localStorage (clave finanzas_tarjetas); no se envían a Google Sheets.
+
+export const CARDS_STORAGE_KEY = "finanzas_tarjetas";
+
+/** Número de días de un mes (monthIndex: 0 = enero) */
+export function daysInMonth(year, monthIndex) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+/** Fecha real (a medianoche, hora local) de un día dentro de un mes "YYYY-MM", ajustada al largo del mes */
+export function getCardDate(monthKey, day) {
+  const { year, monthIndex } = parseMonthKey(monthKey);
+  const safeDay = Math.min(Math.max(parseInt(day, 10) || 1, 1), daysInMonth(year, monthIndex));
+  return new Date(year, monthIndex, safeDay);
+}
+
+/** "2026-10-15" -> "15 oct" */
+export function formatShortDate(date) {
+  if (!date || isNaN(date.getTime())) return "-";
+  return `${date.getDate()} ${MONTH_NAMES_SHORT[date.getMonth()].toLowerCase()}`;
+}
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/**
+ * Estado de pago de una tarjeta en un mes.
+ * kind: "paid" | "overdue" | "today" | "soon" (vence en 5 días o menos) | "upcoming"
+ */
+export function getCardStatus(card, monthKey, today = new Date()) {
+  if (card.paid) {
+    return { kind: "paid", days: 0, label: "Pagada" };
+  }
+  const due = getCardDate(monthKey, card.dueDay);
+  const days = Math.round((due.getTime() - startOfDay(today).getTime()) / 86400000);
+  const plural = (n) => (Math.abs(n) === 1 ? "día" : "días");
+
+  if (days < 0) return { kind: "overdue", days, label: `Vencida hace ${-days} ${plural(days)}` };
+  if (days === 0) return { kind: "today", days, label: "Vence hoy" };
+  if (days <= 5) return { kind: "soon", days, label: `Vence en ${days} ${plural(days)}` };
+  return { kind: "upcoming", days, label: `Vence en ${days} días` };
+}
+
+/** Ordena: primero las pendientes (por fecha de vencimiento) y al final las pagadas */
+export function sortCards(cards) {
+  return [...cards].sort((a, b) => {
+    if (a.paid !== b.paid) return a.paid ? 1 : -1;
+    if (a.dueDay !== b.dueDay) return a.dueDay - b.dueDay;
+    return String(a.name).localeCompare(String(b.name), "es");
+  });
+}
+
+function sanitizeDay(value, fallback = 1) {
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) ? Math.min(Math.max(n, 1), 31) : fallback;
+}
+
+function sanitizeCard(raw) {
+  if (!raw || typeof raw !== "object" || !raw.id || !String(raw.name || "").trim()) return null;
+  return {
+    id: String(raw.id),
+    name: String(raw.name).trim().slice(0, 40),
+    cutDay: sanitizeDay(raw.cutDay),
+    dueDay: sanitizeDay(raw.dueDay),
+    paid: raw.paid === true,
+    paidAt: raw.paid === true && typeof raw.paidAt === "string" ? raw.paidAt : null
+  };
+}
+
+/** Copia de las tarjetas del mes anterior más cercano, todas sin pagar (o null si no hay anterior) */
+export function buildCardsForNewMonth(cardsByMonth, monthKey) {
+  const previous = Object.keys(cardsByMonth || {})
+    .filter((k) => isValidMonthKey(k) && k < monthKey && Array.isArray(cardsByMonth[k]))
+    .sort()
+    .pop();
+  if (!previous) return null;
+  return cardsByMonth[previous].map((c) => ({ ...c, paid: false, paidAt: null }));
+}
+
+function readCardsBackup() {
+  try {
+    const raw = localStorage.getItem(CARDS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const source = parsed && parsed.byMonth && typeof parsed.byMonth === "object" ? parsed.byMonth : {};
+    const result = {};
+    Object.keys(source).forEach((key) => {
+      if (isValidMonthKey(key) && Array.isArray(source[key])) {
+        result[key] = source[key].map(sanitizeCard).filter(Boolean);
+      }
+    });
+    return result;
+  } catch (e) {
+    console.warn("No se pudo leer el respaldo de tarjetas:", e);
+    return {};
+  }
+}
+
+function writeCardsBackup(cardsByMonth) {
+  try {
+    localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify({ version: 1, byMonth: cardsByMonth }));
+  } catch (e) {
+    console.warn("No se pudo guardar el respaldo de tarjetas:", e);
+  }
+}
+
+/**
+ * Hook de la página Tarjetas: tarjetas del mes seleccionado y sus acciones.
+ * Todas las acciones afectan únicamente al mes seleccionado.
+ */
+export function useCards() {
+  const { selectedMonth } = useBudget();
+  const [cardsByMonth, setCardsByMonth] = useState(readCardsBackup);
+  const initialRef = useRef(cardsByMonth);
+
+  // Primera vez que se abre un mes: copia independiente del mes anterior (sin pagar)
+  useEffect(() => {
+    setCardsByMonth((prev) => {
+      if (Array.isArray(prev[selectedMonth])) return prev;
+      const copy = buildCardsForNewMonth(prev, selectedMonth);
+      return copy ? { ...prev, [selectedMonth]: copy } : prev;
+    });
+  }, [selectedMonth]);
+
+  // Respaldo local en cada cambio (se omite el estado inicial para no reescribir lo recién leído)
+  useEffect(() => {
+    if (cardsByMonth === initialRef.current) return;
+    writeCardsBackup(cardsByMonth);
+  }, [cardsByMonth]);
+
+  const cards = useMemo(() => cardsByMonth[selectedMonth] || [], [cardsByMonth, selectedMonth]);
+
+  const updateMonth = useCallback(
+    (updater) => {
+      setCardsByMonth((prev) => ({ ...prev, [selectedMonth]: updater(prev[selectedMonth] || []) }));
+    },
+    [selectedMonth]
+  );
+
+  const addCard = useCallback(
+    ({ name, cutDay, dueDay }) => {
+      const clean = String(name || "").trim().slice(0, 40);
+      if (!clean) return;
+      const card = {
+        id: `card-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        name: clean,
+        cutDay: sanitizeDay(cutDay),
+        dueDay: sanitizeDay(dueDay),
+        paid: false,
+        paidAt: null
+      };
+      updateMonth((list) => [...list, card]);
+    },
+    [updateMonth]
+  );
+
+  const updateCard = useCallback(
+    (id, { name, cutDay, dueDay }) => {
+      const clean = String(name || "").trim().slice(0, 40);
+      if (!clean) return;
+      updateMonth((list) =>
+        list.map((c) =>
+          c.id === id ? { ...c, name: clean, cutDay: sanitizeDay(cutDay), dueDay: sanitizeDay(dueDay) } : c
+        )
+      );
+    },
+    [updateMonth]
+  );
+
+  const deleteCard = useCallback(
+    (id) => updateMonth((list) => list.filter((c) => c.id !== id)),
+    [updateMonth]
+  );
+
+  const togglePaid = useCallback(
+    (id) =>
+      updateMonth((list) =>
+        list.map((c) =>
+          c.id === id
+            ? c.paid
+              ? { ...c, paid: false, paidAt: null }
+              : { ...c, paid: true, paidAt: new Date().toISOString() }
+            : c
+        )
+      ),
+    [updateMonth]
+  );
+
+  return { cards, addCard, updateCard, deleteCard, togglePaid };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 7. REDUCER DEL PRESUPUESTO (POR MES)
 // ─────────────────────────────────────────────────────────────────────────────
 

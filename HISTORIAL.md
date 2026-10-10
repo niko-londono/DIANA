@@ -40,6 +40,7 @@ src/
    - Lanza petición `GET` a `SCRIPT_URL`.
    - Si la red responde con categorías válidas, las agrupa por mes (`deserializeRows`), actualiza el estado y guarda en `localStorage` (`finanzas_backup`, formato `{ version: 2, byMonth }`; también lee el formato antiguo de arreglo plano).
    - Si falla o la hoja está vacía, realiza fallback automático a `localStorage` y finalmente a `DEFAULT_CATEGORIES`.
+- **Tarjetas (v1.11.0)**: se guardan **solo en `localStorage`** (clave `finanzas_tarjetas`, formato `{ version: 1, byMonth }`). No viajan a Google Sheets porque `Code.gs` solo maneja las 6 columnas de categorías; sincronizarlas en la nube requeriría ampliar `Code.gs` (p. ej. una hoja `Tarjetas`).
 3. **Persistencia Automática (`syncData`)**:
    - Al mutar cualquier categoría, guarda de inmediato en `localStorage` (cero pérdida de datos).
    - Ejecuta un guardado asíncrono con **debounce de 1000ms** hacia Google Sheets mediante `POST` con `mode: "no-cors"` y `headers: { "Content-Type": "text/plain;charset=utf-8" }`.
@@ -88,11 +89,26 @@ src/
 | `AddCategoryModal` | Modal reutilizable para crear y editar categorías o subcategorías. |
 | `PlaceholderPage` | Vistas en construcción para las pestañas de navegación secundaria. |
 | `DistributionPage` | Pestaña Distribución: gráfica de barras apiladas por mes (ganancia + reparto por categoría), vista $ / %, KPIs del año, detalle del mes y tabla resumen. |
+| `CardsPage` / `CreditCardModal` | Pestaña Tarjetas: tarjetas del mes con fecha de corte, vencimiento, estado de pago (botón pagada / deshacer), editar y eliminar. El modal sirve para crear y editar. |
 | `Icons` | Colección completa de iconos vectoriales en SVG (Cash, Home, Plane, Vault, etc.). |
 
 ---
 
 ## 📝 5. Historial de Cambios y Actualizaciones
+
+### [v1.11.0] — 2026-10-10 (Tarjetas: corte, vencimiento y pago por mes)
+- **Nueva pestaña Tarjetas** (`diana-master.jsx`, `CardsPage` + `CreditCardModal`): reemplaza el placeholder "Próximamente".
+  - **Agregar / editar tarjeta**: nombre (máx. 40 caracteres), fecha de corte y fecha de vencimiento. El modal reutiliza el estilo de `AddCategoryModal`. Los días se eligen de una lista 1–31 y son obligatorios.
+  - **Botón de pago** en cada tarjeta: "Marcar como pagada" ⇄ "Pagada el 10 oct · Deshacer" (guarda la fecha de pago, `aria-pressed`).
+  - **Estado automático** según la fecha de vencimiento del mes: Pagada, Vence en N días, Vence hoy (≤ 5 días se resalta en ámbar) o Vencida hace N días. Un mes pasado sin pagar aparece vencido.
+  - **Orden**: pendientes primero por vencimiento; las pagadas al final.
+  - **Indicadores**: pagadas (con barra de progreso), pendientes (y cuántas vencidas), próximo vencimiento y total de tarjetas.
+  - **Eliminar** con confirmación (`window.confirm`) que aclara que los demás meses no se modifican.
+- **Por mes, igual que el presupuesto**: `cutDay` y `dueDay` son el día del mes dentro del mes seleccionado (si el mes es más corto se usa su último día; día 31 en abril = 30). Cada mes tiene su propia lista y su propio estado de pago; agregar, editar, eliminar o pagar solo afecta al mes seleccionado. Al abrir por primera vez un mes sin tarjetas se crea como **copia independiente del mes anterior más cercano con todas las tarjetas sin pagar** (no se copia hacia atrás: un mes anterior a todos los registrados queda vacío).
+- **Lógica** (`diana-master.js`, sección 6C): `useCards` (hook de la página), `getCardDate`, `getCardStatus`, `sortCards`, `buildCardsForNewMonth`, `formatShortDate`, `daysInMonth`. Los datos leídos de `localStorage` se sanean (nombres vacíos, días fuera de rango, meses inválidos o JSON dañado no rompen la página).
+- **Almacenamiento**: solo `localStorage` (ver sección 2); el indicador "Sincronizado con la nube" del encabezado aplica al presupuesto, no a las tarjetas.
+- **Estilos** (`diana-master.css`, sección 16): `.credit-*`, más `.form-hint`; reutiliza hero, KPIs (`.dist-kpi-*`) y modal existentes. Responsive: una columna a ≤ 600px y botón de agregar a todo el ancho.
+- Verificado con Vite 5 (build sin errores) y 19 pruebas en total (10 nuevas de Tarjetas: estados de pago, ajuste por largo de mes, copia al mes nuevo sin pagar, independencia entre meses, editar/eliminar, persistencia y datos dañados).
 
 ### [v1.10.0] — 2026-10-10 (Distribución: ganancia por mes y reparto mensual)
 - **Nueva pestaña Distribución** (`diana-master.jsx`, `DistributionPage`): reemplaza el placeholder "Próximamente".

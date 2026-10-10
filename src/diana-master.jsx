@@ -14,6 +14,7 @@
  * 9. Páginas Auxiliares (PlaceholderPage)
  * 10. Vista Principal (Overview) y Componente Raíz de la Aplicación (DianaApp)
  * 11. Distribución por mes (DistributionPage): ganancia mensual y reparto por categoría
+ * 12. Tarjetas por mes (CardsPage, CreditCardModal): corte, vencimiento y estado de pago
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
@@ -45,7 +46,12 @@ import {
   DEFAULT_GOAL,
   GOAL_STORAGE_KEY,
   buildYearDistribution,
-  formatCompactCurrency
+  formatCompactCurrency,
+  useCards,
+  getCardDate,
+  formatShortDate,
+  getCardStatus,
+  sortCards
 } from "./diana-master.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2545,6 +2551,306 @@ export function DistributionPage() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 10C. TARJETAS DE CRÉDITO POR MES (CARDSPAGE)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1);
+
+export function CreditCardModal({ isOpen, onClose, onSave, cardToEdit = null, monthLabel = "" }) {
+  const [name, setName] = useState("");
+  const [cutDay, setCutDay] = useState("");
+  const [dueDay, setDueDay] = useState("");
+  const nameRef = useRef(null);
+
+  const isEditing = Boolean(cardToEdit);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setName(cardToEdit ? cardToEdit.name : "");
+    setCutDay(cardToEdit ? String(cardToEdit.cutDay) : "");
+    setDueDay(cardToEdit ? String(cardToEdit.dueDay) : "");
+    const t = setTimeout(() => nameRef.current?.focus(), 100);
+    return () => clearTimeout(t);
+  }, [isOpen, cardToEdit]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name.trim() || !cutDay || !dueDay) return;
+    onSave({ name: name.trim(), cutDay: Number(cutDay), dueDay: Number(dueDay) });
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="modal-overlay active"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      id="credit-card-modal"
+    >
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="cc-modal-title">
+        <div className="modal-header">
+          <h3 id="cc-modal-title">{isEditing ? "Editar Tarjeta" : "Nueva Tarjeta"}</h3>
+          <button className="modal-close" onClick={onClose} aria-label="Cerrar" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-group">
+              <label htmlFor="cc-name">Nombre de la Tarjeta</label>
+              <input
+                ref={nameRef}
+                type="text"
+                id="cc-name"
+                className="form-input"
+                placeholder="Ej. BBVA Oro, Nu, Liverpool"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={40}
+                required
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="cc-cut">Fecha de Corte</label>
+                <select
+                  id="cc-cut"
+                  className="form-input"
+                  value={cutDay}
+                  onChange={(e) => setCutDay(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>Elige el día</option>
+                  {DAY_OPTIONS.map((d) => (
+                    <option key={d} value={d}>Día {d}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="cc-due">Fecha de Vencimiento</label>
+                <select
+                  id="cc-due"
+                  className="form-input"
+                  value={dueDay}
+                  onChange={(e) => setDueDay(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>Elige el día</option>
+                  {DAY_OPTIONS.map((d) => (
+                    <option key={d} value={d}>Día {d}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <p className="form-hint">
+              Los días corresponden a {monthLabel}. Si el mes es más corto, se usa su último día.
+              Solo afecta a este mes.
+            </p>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primary">
+              {isEditing ? "Guardar Cambios" : "Agregar Tarjeta"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export function CardsPage() {
+  const { selectedMonth, selectedMonthLabel } = useBudget();
+  const { cards, addCard, updateCard, deleteCard, togglePaid } = useCards();
+  const [modal, setModal] = useState({ open: false, card: null });
+
+  const today = new Date();
+  const sorted = useMemo(() => sortCards(cards), [cards]);
+
+  const paidCount = cards.filter((c) => c.paid).length;
+  const pendingCount = cards.length - paidCount;
+  const overdueCount = cards.filter((c) => getCardStatus(c, selectedMonth, today).kind === "overdue").length;
+  const nextDue = sorted.find((c) => !c.paid) || null;
+  const paidPct = cards.length > 0 ? (paidCount / cards.length) * 100 : 0;
+
+  const openNew = () => setModal({ open: true, card: null });
+  const openEdit = (card) => setModal({ open: true, card });
+  const closeModal = () => setModal({ open: false, card: null });
+
+  const handleSave = (values) => {
+    if (modal.card) updateCard(modal.card.id, values);
+    else addCard(values);
+  };
+
+  const handleDelete = (card) => {
+    if (window.confirm(`¿Estás seguro de eliminar la tarjeta "${card.name}" de ${selectedMonthLabel}? Los demás meses no se modifican.`)) {
+      deleteCard(card.id);
+    }
+  };
+
+  return (
+    <div className="projection-container" id="tarjetas-view">
+      <Header />
+
+      <div className="projection-hero-header">
+        <div className="projection-hero-top">
+          <div className="projection-hero-titles">
+            <span className="projection-pill-tag">PLANIFICADOR FINANCIERO</span>
+            <h1 className="projection-hero-title">Tarjetas</h1>
+            <h2 className="projection-hero-subtitle">Corte, vencimiento y pagos de {selectedMonthLabel}</h2>
+          </div>
+          <button type="button" className="btn btn-primary credit-add-btn" onClick={openNew} id="btn-add-card">
+            <PlusIcon size={16} />
+            Agregar tarjeta
+          </button>
+        </div>
+        <p className="projection-hero-desc">
+          Cada mes tiene sus propias tarjetas y su propio estado de pago. Se guardan en este dispositivo.
+        </p>
+      </div>
+
+      <div className="dist-kpi-grid">
+        <div className="dist-kpi dist-kpi-featured">
+          <span className="dist-kpi-label">PAGADAS</span>
+          <strong className="dist-kpi-value">{paidCount} de {cards.length}</strong>
+          <div className="credit-progress" aria-hidden="true">
+            <div className="credit-progress-fill" style={{ width: `${paidPct}%` }} />
+          </div>
+        </div>
+        <div className="dist-kpi">
+          <span className="dist-kpi-label">PENDIENTES</span>
+          <strong className="dist-kpi-value">{pendingCount}</strong>
+          <span className="dist-kpi-sub">
+            {overdueCount > 0
+              ? `${overdueCount} ${overdueCount === 1 ? "vencida" : "vencidas"}`
+              : cards.length === 0 ? "Sin tarjetas" : "Sin vencidas"}
+          </span>
+        </div>
+        <div className="dist-kpi">
+          <span className="dist-kpi-label">PRÓXIMO VENCIMIENTO</span>
+          <strong className="dist-kpi-value">{nextDue ? formatShortDate(getCardDate(selectedMonth, nextDue.dueDay)) : "—"}</strong>
+          <span className="dist-kpi-sub">
+            {nextDue ? nextDue.name : cards.length === 0 ? "Sin tarjetas" : "Todo pagado"}
+          </span>
+        </div>
+        <div className="dist-kpi">
+          <span className="dist-kpi-label">TARJETAS</span>
+          <strong className="dist-kpi-value">{cards.length}</strong>
+          <span className="dist-kpi-sub">en {selectedMonthLabel}</span>
+        </div>
+      </div>
+
+      {cards.length === 0 ? (
+        <section className="projection-card dist-card">
+          <div className="dist-empty">
+            <strong>No hay tarjetas en {selectedMonthLabel}</strong>
+            <span>Agrega tu primera tarjeta con su fecha de corte y de vencimiento.</span>
+            <button type="button" className="btn btn-primary credit-empty-btn" onClick={openNew}>
+              <PlusIcon size={16} />
+              Agregar tarjeta
+            </button>
+          </div>
+        </section>
+      ) : (
+        <div className="credit-cards-grid" id="credit-cards-list">
+          {sorted.map((card) => {
+            const status = getCardStatus(card, selectedMonth, today);
+            const cutDate = getCardDate(selectedMonth, card.cutDay);
+            const dueDate = getCardDate(selectedMonth, card.dueDay);
+            const paidDate = card.paidAt ? new Date(card.paidAt) : null;
+            const paidLabel = paidDate && !isNaN(paidDate.getTime())
+              ? `Pagada el ${formatShortDate(paidDate)}`
+              : "Pagada";
+
+            return (
+              <article className={`credit-card-item status-${status.kind}`} key={card.id}>
+                <div className="credit-card-top">
+                  <div className="credit-card-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="5" width="20" height="14" rx="2" />
+                      <line x1="2" y1="10" x2="22" y2="10" />
+                    </svg>
+                  </div>
+                  <div className="credit-card-title">
+                    <h3 title={card.name}>{card.name}</h3>
+                    <span className={`credit-chip chip-${status.kind}`}>{status.label}</span>
+                  </div>
+                  <div className="credit-card-actions">
+                    <button type="button" className="credit-icon-btn" onClick={() => openEdit(card)} aria-label={`Editar ${card.name}`} title="Editar">
+                      <EditIcon size={15} />
+                    </button>
+                    <button type="button" className="credit-icon-btn is-danger" onClick={() => handleDelete(card)} aria-label={`Eliminar ${card.name}`} title="Eliminar">
+                      <TrashIcon size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="credit-card-dates">
+                  <div className="credit-date-box">
+                    <span className="credit-date-label">CORTE</span>
+                    <strong>{formatShortDate(cutDate)}</strong>
+                    <small>Día {card.cutDay}</small>
+                  </div>
+                  <div className="credit-date-box">
+                    <span className="credit-date-label">VENCIMIENTO</span>
+                    <strong>{formatShortDate(dueDate)}</strong>
+                    <small>Día {card.dueDay}</small>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className={`credit-pay-btn${card.paid ? " is-paid" : ""}`}
+                  onClick={() => togglePaid(card.id)}
+                  aria-pressed={card.paid}
+                  aria-label={card.paid ? `Desmarcar ${card.name} como pagada` : `Marcar ${card.name} como pagada`}
+                >
+                  {card.paid ? (
+                    <>
+                      <span className="credit-pay-main"><CheckIcon size={16} /> {paidLabel}</span>
+                      <span className="credit-pay-undo">Deshacer</span>
+                    </>
+                  ) : (
+                    <span className="credit-pay-main">Marcar como pagada</span>
+                  )}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      <CreditCardModal
+        isOpen={modal.open}
+        onClose={closeModal}
+        onSave={handleSave}
+        cardToEdit={modal.card}
+        monthLabel={selectedMonthLabel}
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 11. COMPONENTE RAÍZ DE LA APLICACIÓN (DIANAAPP)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2553,7 +2859,7 @@ const PAGES = {
   proyeccion: <GoalProjectionPage />,
   summary: <GoalProjectionPage />, // retrocompatibilidad con enlaces anteriores
   distribution: <DistributionPage />,
-  cards: <PlaceholderPage title="Tarjetas" description="Administra tus tarjetas de crédito y débito." />,
+  cards: <CardsPage />,
   settings: <PlaceholderPage title="Settings" description="Configura las preferencias de tu presupuesto." />,
   notes: <PlaceholderPage title="Notes" description="Notas y recordatorios financieros personales." />,
 };
