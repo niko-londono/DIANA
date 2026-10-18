@@ -312,12 +312,11 @@ export function Sidebar({ activePage, onNavigate }) {
 
       <aside className={`sidebar ${isOpen ? "open" : ""} ${isCollapsed ? "collapsed" : ""}`} id="sidebar">
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" />
-              <rect x="14" y="3" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" />
+          <div className="sidebar-logo-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <rect x="4" y="5" width="16" height="3" rx="1.5" />
+              <rect x="4" y="10.5" width="11" height="3" rx="1.5" opacity="0.6" />
+              <rect x="4" y="16" width="6" height="3" rx="1.5" className="sidebar-logo-accent" />
             </svg>
           </div>
           {!isCollapsed && <span className="sidebar-logo-text">Finanzas</span>}
@@ -501,12 +500,9 @@ export function Header() {
   return (
     <header className="dashboard-topbar">
       <div className="topbar-brand">
-        <div className="topbar-logo">
-          <span>$</span>
-        </div>
         <div className="topbar-titles">
-          <span className="topbar-subtitle">PLANIFICADOR FINANCIERO</span>
-          <h1 className="topbar-title">Control Presupuestario</h1>
+          <span className="topbar-subtitle">Planificador financiero</span>
+          <h1 className="topbar-title">Control presupuestario</h1>
         </div>
       </div>
 
@@ -552,12 +548,12 @@ export function BudgetHero({ onNewCategory }) {
     <div className="budget-hero-section" id="budget-hero">
       <div className="hero-left-block">
         <div className="hero-title-row">
-          <h2 className="hero-title">Resumen del Presupuesto</h2>
+          <h2 className="hero-title">Resumen del <em>presupuesto</em></h2>
 
           {isBalanced ? (
             <span className="balance-pill-badge balanced">
               <CheckIcon size={12} />
-              <span className="badge-text-full">Presupuesto Balanceado (Cuadrado a Cero)</span>
+              <span className="badge-text-full">Cuadrado a cero</span>
               <span className="badge-text-short">Balance Cero ($0.00)</span>
             </span>
           ) : remainingBalance > 0 ? (
@@ -574,7 +570,7 @@ export function BudgetHero({ onNewCategory }) {
         </div>
 
         <p className="hero-subtitle">
-          Cada peso tiene un propósito. Ingresos totales asignados con exactitud a gastos y ahorros.
+          Cada peso tiene un propósito: el ingreso del mes queda asignado a gastos, viajes y ahorro.
         </p>
       </div>
 
@@ -596,7 +592,7 @@ export function BudgetHero({ onNewCategory }) {
           type="button"
         >
           <PlusIcon size={14} />
-          <span>Nueva Categoría</span>
+          <span>Nueva categoría</span>
         </button>
 
         <div className="more-menu-wrapper">
@@ -665,7 +661,7 @@ export function MetricCards() {
       {/* Tarjeta 1: Ingreso Base */}
       <div className="metric-card card-income" id="metric-card-income">
         <div className="card-top-row">
-          <span className="card-label">{hasExtraIncome ? "INGRESO TOTAL (SUELDO + EXTRAS)" : "INGRESO BASE (SUELDO)"}</span>
+          <span className="card-label">{hasExtraIncome ? "Ingreso total · sueldo + extras" : "Ingreso base · sueldo"}</span>
           <div className="card-icon-box bg-emerald-light text-emerald">
             <CategoryIcon name="cash" size={18} />
           </div>
@@ -687,13 +683,13 @@ export function MetricCards() {
         else if (cat.name.toLowerCase().includes("ahorro")) subLabel = "Inversión y emergencias";
         else if (meta.type === "Gasto Fijo") subLabel = "del total del sueldo";
 
-        let cardTitle = cat.name.toUpperCase();
+        let cardTitle = cat.name;
         if (cat.id === "gastos-m" || cat.name.toLowerCase() === "gastos m") {
-          cardTitle = "GASTOS FIJOS (GASTOS M)";
+          cardTitle = "Gastos fijos · gastos M";
         } else if (cat.name.toLowerCase().includes("viaje")) {
-          cardTitle = "VIAJES & VACACIONES";
+          cardTitle = "Viajes y vacaciones";
         } else if (cat.name.toLowerCase().includes("ahorro")) {
-          cardTitle = "FONDO DE AHORRO";
+          cardTitle = "Fondo de ahorro";
         }
 
         const styleTheme = METRIC_CARD_THEMES[idx % METRIC_CARD_THEMES.length];
@@ -707,6 +703,9 @@ export function MetricCards() {
               </div>
             </div>
             <div className="card-amount">{formatCurrency(cat.budgeted)}</div>
+            <div className="card-meter" aria-hidden="true">
+              <span className={`card-meter-fill ${styleTheme.highlight}`} style={{ width: percent }} />
+            </div>
             <div className="card-subtext">
               <strong className={styleTheme.highlight}>{percent}</strong>
               <span>{subLabel}</span>
@@ -735,7 +734,7 @@ export function AllocationBar() {
     <div className="allocation-card" id="allocation-distribution">
       <div className="allocation-header">
         <div className="allocation-title-group">
-          <span className="allocation-title">Distribución de Asignación</span>
+          <span className="allocation-title">Distribución de asignación</span>
           <span className="allocation-subtitle">
             ({formatCurrency(totalExpenses)} distribuidos al {totalAllocatedPercent.toFixed(0)}%)
           </span>
@@ -843,7 +842,7 @@ export function BudgetTable({ onEditCategory }) {
     <div className="budget-table-card" id="budget-table-card">
       <div className="table-card-header">
         <div className="table-header-titles">
-          <h2 className="table-card-title">Desglose de Categorías</h2>
+          <h2 className="table-card-title">Desglose de categorías</h2>
           <p className="table-card-subtitle">
             Revisa la asignación presupuestaria y su balance contra el ingreso principal.
           </p>
@@ -1404,7 +1403,7 @@ export function AddCategoryModal({ isOpen, onClose, categoryToEdit = null }) {
     >
       <div className="modal-card">
         <div className="modal-header">
-          <h3>{isEditing ? "Editar Categoría" : "Nueva Categoría"}</h3>
+          <h3>{isEditing ? "Editar categoría" : "Nueva categoría"}</h3>
           <button className="modal-close" onClick={onClose} aria-label="Cerrar" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -1416,7 +1415,7 @@ export function AddCategoryModal({ isOpen, onClose, categoryToEdit = null }) {
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             <div className="form-group">
-              <label htmlFor="cat-name">Nombre de la Categoría</label>
+              <label htmlFor="cat-name">Nombre de la categoría</label>
               <input
                 ref={nameRef}
                 type="text"
@@ -1447,7 +1446,7 @@ export function AddCategoryModal({ isOpen, onClose, categoryToEdit = null }) {
               </div>
 
               <div className="form-group">
-                <label htmlFor="cat-type">Tipo de Categoría</label>
+                <label htmlFor="cat-type">Tipo de categoría</label>
                 <select
                   id="cat-type"
                   className="form-input"
@@ -1462,7 +1461,7 @@ export function AddCategoryModal({ isOpen, onClose, categoryToEdit = null }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="cat-subtext">Descripción o Subtítulo</label>
+              <label htmlFor="cat-subtext">Descripción o subtítulo</label>
               <input
                 type="text"
                 id="cat-subtext"
@@ -1475,14 +1474,14 @@ export function AddCategoryModal({ isOpen, onClose, categoryToEdit = null }) {
 
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="cat-parent">Categoría Padre (Opcional)</label>
+                <label htmlFor="cat-parent">Categoría padre (opcional)</label>
                 <select
                   id="cat-parent"
                   className="form-input"
                   value={parentId}
                   onChange={(e) => setParentId(e.target.value)}
                 >
-                  <option value="">Ninguna (Categoría Principal)</option>
+                  <option value="">Ninguna (categoría principal)</option>
                   {parentOptions.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
@@ -1514,7 +1513,7 @@ export function AddCategoryModal({ isOpen, onClose, categoryToEdit = null }) {
               Cancelar
             </button>
             <button type="submit" className="btn btn-primary">
-              {isEditing ? "Guardar Cambios" : "Crear Categoría"}
+              {isEditing ? "Guardar cambios" : "Crear categoría"}
             </button>
           </div>
         </form>
@@ -1740,13 +1739,13 @@ export function GoalProjectionPage() {
       <div className="projection-hero-header">
         <div className="projection-hero-top">
           <div className="projection-hero-titles">
-            <span className="projection-pill-tag">PLANIFICADOR FINANCIERO</span>
-            <h1 className="projection-hero-title">Proyección de Metas</h1>
-            <h2 className="projection-hero-subtitle">Calculadora de Metas de Ahorro</h2>
+            <span className="projection-pill-tag">Metas de ahorro</span>
+            <h1 className="projection-hero-title">Proyección de metas</h1>
+            <h2 className="projection-hero-subtitle">Calculadora de metas de ahorro</h2>
           </div>
 
           <div className="projection-presets-wrapper">
-            <span className="presets-label">Plantillas Rápidas:</span>
+            <span className="presets-label">Plantillas rápidas</span>
             <div className="presets-buttons">
               {PRESETS.map((p) => (
                 <button
@@ -2189,7 +2188,7 @@ export function DistributionPage() {
       <div className="projection-hero-header">
         <div className="projection-hero-top">
           <div className="projection-hero-titles">
-            <span className="projection-pill-tag">PLANIFICADOR FINANCIERO</span>
+            <span className="projection-pill-tag">Análisis anual</span>
             <h1 className="projection-hero-title">Distribución</h1>
             <h2 className="projection-hero-subtitle">Ganancias y distribución mes a mes</h2>
           </div>
@@ -2367,7 +2366,7 @@ export function DistributionPage() {
                                 <span
                                   key={it.id}
                                   className="dist-seg"
-                                  style={{ flexGrow: it.amount, background: catById[it.id] ? catById[it.id].color : "#94a3b8" }}
+                                  style={{ flexGrow: it.amount, background: catById[it.id] ? catById[it.id].color : "#a19d91" }}
                                 />
                               ))}
                               {surplus > 0 && (
@@ -2669,7 +2668,7 @@ export function CreditCardModal({ isOpen, onClose, onSave, cardToEdit = null, mo
               Cancelar
             </button>
             <button type="submit" className="btn btn-primary">
-              {isEditing ? "Guardar Cambios" : "Agregar Tarjeta"}
+              {isEditing ? "Guardar cambios" : "Agregar tarjeta"}
             </button>
           </div>
         </form>
@@ -2714,7 +2713,7 @@ export function CardsPage() {
       <div className="projection-hero-header">
         <div className="projection-hero-top">
           <div className="projection-hero-titles">
-            <span className="projection-pill-tag">PLANIFICADOR FINANCIERO</span>
+            <span className="projection-pill-tag">Pagos del mes</span>
             <h1 className="projection-hero-title">Tarjetas</h1>
             <h2 className="projection-hero-subtitle">Corte, vencimiento y pagos de {selectedMonthLabel}</h2>
           </div>

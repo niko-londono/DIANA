@@ -79,8 +79,8 @@ src/
 | Componente | Función |
 | :--- | :--- |
 | `DianaApp` | Componente raíz, envuelve en `BudgetProvider`, gestiona navegación y sidebar. |
-| `Sidebar` | Barra lateral con navegación, botón de colapso de escritorio y menú hamburguesa móvil. |
-| `Header` | Barra superior con logo, título, badge de sincronización y `MonthPicker`. |
+| `Sidebar` | Barra lateral con logo, navegación, botón de colapso de escritorio y menú hamburguesa móvil. |
+| `Header` | Barra superior con título, badge de sincronización y `MonthPicker`. |
 | `MonthPicker` | Calendario solo de meses y años (cuadrícula 3×4, flechas de año, botón "Mes actual", punto en meses con presupuesto). Cierra con Escape o clic fuera. |
 | `BudgetHero` | Cabecera con badge de balance cero/superávit/déficit, exportación CSV y botón "Nueva Categoría". |
 | `MetricCards` | Cuadrícula de 4 tarjetas: Ingreso Base, Gastos M, Viajes & Vacaciones y Fondo de Ahorro. |
@@ -95,6 +95,15 @@ src/
 ---
 
 ## 📝 5. Historial de Cambios y Actualizaciones
+
+### [v1.12.0] — 2026-10-18 (Rediseño visual "libro contable")
+- **Tipografía** (`index.html`, `diana-master.css`): Inter reemplazada por **Geist** (UI), **Instrument Serif** (títulos y montos grandes, `--font-display`) y **Geist Mono** (cifras de tabla y porcentajes, `--font-mono`). Cifras con `tabular-nums`; títulos con `text-wrap: balance`.
+- **Paleta**: los grises fríos y los acentos saturados de Tailwind (esmeralda, índigo, cian, púrpura) se reemplazaron por neutros cálidos tipo papel (`#f4f2ec`), tinta (`#1d1c19`) y un solo acento verde pino (`#2f7a56`; `#8cc7a3` sobre oscuro). Las series de datos usan tonos apagados: azul pizarra (Gastos), verde azulado (Viajes), arcilla (Ahorro/Patrimonio). Ajustados también `DISTRIBUTION_COLORS`, `ALLOCATION_COLOR_PALETTE` y `getCategoryMeta` en `diana-master.js`.
+- **Superficies**: sombras con tinte cálido, filo de luz interior en tarjetas, grano de papel sutil fijo (`.app-layout::after`), tarjeta de ingreso destacada en tinta oscura con columna más ancha, mini‑barra de proporción en las tarjetas de gasto, barra de asignación con fondo rayado.
+- **Encabezados oscuros** de Proyección, Distribución y Tarjetas: ahora tarjetas redondeadas con título serif, etiqueta superior propia por página (antes repetían "PLANIFICADOR FINANCIERO") y contenido alineado al mismo ancho (se quitaron los márgenes laterales de 2rem).
+- **Estados**: presión en botones (`scale(0.98)`), anillo de foco global, botón primario en tinta, acción "Exportar" como texto, acciones de la tabla atenuadas hasta pasar el cursor, entrada escalonada del Resumen (termina en `transform: none` para no tapar los menús). Respeta `prefers-reduced-motion` y la impresión desactiva animaciones y grano.
+- **Textos**: navegación en español (Resumen, Ajustes, Notas), mayúsculas de oración en títulos, etiquetas y modal; nuevo favicon y logo (líneas de libro contable); `<title>` y metas `og:` actualizados.
+- **Sin cambios** en lógica, cálculos, sincronización ni `Code.gs`. Build de Vite verificado y revisión visual en escritorio (1366px) y móvil (375px).
 
 ### [v1.11.0] — 2026-10-10 (Tarjetas: corte, vencimiento y pago por mes)
 - **Nueva pestaña Tarjetas** (`diana-master.jsx`, `CardsPage` + `CreditCardModal`): reemplaza el placeholder "Próximamente".

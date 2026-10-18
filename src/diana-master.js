@@ -86,11 +86,11 @@ export const ICONS_OPTIONS = [
 ];
 
 export const ALLOCATION_COLOR_PALETTE = [
-  { color: "#6366f1", label: "Gastos M" },
-  { color: "#06b6d4", label: "Viajes" },
-  { color: "#a855f7", label: "Ahorro" },
-  { color: "#f59e0b", label: "Otros" },
-  { color: "#ec4899", label: "Extra" }
+  { color: "#5a6f94", label: "Gastos M" },
+  { color: "#3d8a86", label: "Viajes" },
+  { color: "#c07447", label: "Ahorro" },
+  { color: "#8a6487", label: "Otros" },
+  { color: "#b8862b", label: "Extra" }
 ];
 
 export const METRIC_CARD_THEMES = [
@@ -100,12 +100,12 @@ export const METRIC_CARD_THEMES = [
 ];
 
 export const NAV_ITEMS = [
-  { id: "overview", label: "Overview", iconType: "grid" },
+  { id: "overview", label: "Resumen", iconType: "grid" },
   { id: "proyeccion", label: "Proyección", iconType: "trending" },
   { id: "distribution", label: "Distribución", iconType: "pie" },
   { id: "cards", label: "Tarjetas", iconType: "card" },
-  { id: "settings", label: "Settings", iconType: "settings" },
-  { id: "notes", label: "Notes", iconType: "notes" }
+  { id: "settings", label: "Ajustes", iconType: "settings" },
+  { id: "notes", label: "Notas", iconType: "notes" }
 ];
 
 export const DEFAULT_CATEGORIES = [
@@ -223,8 +223,8 @@ export function getCategoryMeta(cat) {
       subtext: "",
       icon: "default",
       badgeCls: "badge-variable",
-      color: "#64748b",
-      bgColor: "#f1f5f9"
+      color: "#6f6c63",
+      bgColor: "#f0eee8"
     };
   }
 
@@ -237,8 +237,8 @@ export function getCategoryMeta(cat) {
       subtext: cat.subtext || (isSueldo ? "Ingreso recurrente de nómina" : "Ingreso adicional que se suma al sueldo"),
       icon: cat.icon || "cash",
       badgeCls: "badge-income",
-      color: "#10b981",
-      bgColor: "#ecfdf5"
+      color: "#2f7a56",
+      bgColor: "#e9f1eb"
     };
   }
 
@@ -251,8 +251,8 @@ export function getCategoryMeta(cat) {
       subtext: cat.subtext || "Renta, servicios, despensa y compromisos fijos",
       icon: cat.icon || "home",
       badgeCls: "badge-fixed",
-      color: "#6366f1",
-      bgColor: "#eef2ff"
+      color: "#5a6f94",
+      bgColor: "#ebeef4"
     };
   }
 
@@ -262,8 +262,8 @@ export function getCategoryMeta(cat) {
       subtext: cat.subtext || "Escapadas, boletos y fondo vacacional",
       icon: cat.icon || "travel",
       badgeCls: "badge-lifestyle",
-      color: "#06b6d4",
-      bgColor: "#ecfeff"
+      color: "#3d8a86",
+      bgColor: "#e7f1f0"
     };
   }
 
@@ -273,8 +273,8 @@ export function getCategoryMeta(cat) {
       subtext: cat.subtext || "Inversión mensual y fondo de resguardo",
       icon: cat.icon || "savings",
       badgeCls: "badge-wealth",
-      color: "#a855f7",
-      bgColor: "#faf5ff"
+      color: "#c07447",
+      bgColor: "#f6ece4"
     };
   }
 
@@ -283,8 +283,8 @@ export function getCategoryMeta(cat) {
     subtext: cat.subtext || "Asignación presupuestaria mensual",
     icon: cat.icon || "default",
     badgeCls: "badge-variable",
-    color: "#3b82f6",
-    bgColor: "#eff6ff"
+    color: "#46698c",
+    bgColor: "#eaeff4"
   };
 }
 
@@ -598,8 +598,8 @@ function writeLocalBackup(byMonth) {
 // La "distribución" es cómo se repartió ese ingreso entre las categorías principales de gasto.
 
 export const DISTRIBUTION_COLORS = [
-  "#6366f1", "#06b6d4", "#a855f7", "#f59e0b", "#ec4899",
-  "#3b82f6", "#f97316", "#14b8a6", "#84cc16", "#f43f5e"
+  "#5a6f94", "#3d8a86", "#c07447", "#8a6487", "#b8862b",
+  "#8a9a5b", "#b0667a", "#2f4a66", "#7d6f5c", "#a85454"
 ];
 
 /** Moneda compacta para ejes de gráficas: 17000 -> "$17k", 1250000 -> "$1.25M" */
