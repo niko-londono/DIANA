@@ -3056,18 +3056,60 @@ const PAGES = {
   notes: <PlaceholderPage title="Notes" description="Notas y recordatorios financieros personales." />,
 };
 
+/**
+ * Barra de navegación inferior (celular y tablet, hasta 1024px), al estilo de una app.
+ * En PC se oculta por CSS y se usa el menú lateral.
+ */
+export function BottomNav({ activePage, onNavigate }) {
+  return (
+    <nav className="bottom-nav" aria-label="Navegación principal">
+      {NAV_ITEMS.map((item) => {
+        const isActive = activePage === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            className={`bottom-nav-item ${isActive ? "active" : ""}`}
+            onClick={() => onNavigate(item.id)}
+            aria-current={isActive ? "page" : undefined}
+            id={`bottom-nav-${item.id}`}
+          >
+            <span className="bottom-nav-icon" aria-hidden="true">
+              <NavIcon type={item.iconType} />
+            </span>
+            <span className="bottom-nav-label">{item.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 export default function DianaApp() {
   const [activePage, setActivePage] = useState("overview");
+  const scrollRef = useRef(null);
+
+  // Cambiar de sección empieza arriba; tocar la sección activa vuelve arriba (como en iOS)
+  const navigate = (id) => {
+    const el = scrollRef.current;
+    if (id === activePage) {
+      if (el) el.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setActivePage(id);
+    if (el) el.scrollTop = 0;
+  };
 
   return (
     <BudgetProvider>
       <div className="app-layout">
-        <Sidebar activePage={activePage} onNavigate={setActivePage} />
+        <Sidebar activePage={activePage} onNavigate={navigate} />
         <main className="main-content">
-          <div className="main-scroll">
+          <div className="main-scroll" ref={scrollRef}>
             {PAGES[activePage] || <Overview />}
           </div>
         </main>
+        <BottomNav activePage={activePage} onNavigate={navigate} />
       </div>
     </BudgetProvider>
   );
