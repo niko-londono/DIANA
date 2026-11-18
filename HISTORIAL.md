@@ -127,6 +127,9 @@ src/
 
 ## 📝 5. Historial de Cambios y Actualizaciones
 
+### [v1.17.1] — 2026-11-17 (Fluido de la esfera de carga)
+- La forma interior de la esfera se salía por encima del cristal y se cortaba en seco: el SVG tenía `overflow: visible` y la región del filtro "gooey" dependía del tamaño de las formas (cambiaba al girar). Ahora el filtro tiene una región fija (`filterUnits="userSpaceOnUse"`) y `.orb-core` recorta el fluido al círculo (`clip-path: circle(50%)`).
+
 ### [v1.17.0] — 2026-11-17 (Modo oscuro y pantalla de carga)
 - **Modo oscuro en toda la app**: botón sol/luna en la barra superior (`ThemeToggle`, junto al indicador de sincronización). Paleta "libro contable de noche": carbón cálido (`#141311` / `#1c1b18`), nunca negro puro ni gris frío; los héroes de tinta pasan a ser más hondos que el fondo con un filo de luz; el verde de texto sube a `#7cc199` para mantener el contraste. Recuerda la elección (`finanzas_tema`) o sigue al sistema; actualiza el `theme-color` de la barra del navegador; transición suave solo durante el cambio.
 - **Tokenización**: ~230 colores literales de `diana-master.css` pasaron a tokens según la propiedad donde estaban (fondo, texto o borde), más los tintes de los badges de tipo (`getCategoryMeta` ahora devuelve `bgColor` y `textColor` como variables CSS). Ver sección 4B.

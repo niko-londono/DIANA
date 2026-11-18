@@ -5055,7 +5055,9 @@ input[type="date"].form-input::-webkit-date-and-time-value {
   position: absolute;
   inset: 0;
   display: block;
-  overflow: visible;
+  overflow: hidden;
+  border-radius: 50%;
+  clip-path: circle(50% at 50% 50%); /* el fluido nunca sale del cristal */
 }
 
 .orb-stop-one { stop-color: var(--orb-one); }

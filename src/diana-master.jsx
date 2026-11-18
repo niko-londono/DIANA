@@ -578,7 +578,9 @@ export function AppLoader() {
               <stop offset="30%" className="orb-stop-one" />
               <stop offset="70%" className="orb-stop-two" />
             </linearGradient>
-            <filter id="orb-goo" x="-20%" y="-20%" width="140%" height="140%">
+            {/* Región fija del filtro: si dependiera del tamaño de las formas, al girar
+                cortaría el fluido en seco y lo desplazaría */}
+            <filter id="orb-goo" filterUnits="userSpaceOnUse" x="-20" y="-20" width="140" height="140">
               <feGaussianBlur in="SourceGraphic" stdDeviation="7" />
               <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -6">
                 <animate
