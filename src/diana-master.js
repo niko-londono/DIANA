@@ -1096,6 +1096,10 @@ export function BudgetProvider({ children }) {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey); // "YYYY-MM"
   const [templates, setTemplates] = useState(null); // plantillas de metas (null hasta cargar)
   const isFirstRender = useRef(true);
+  // Solo se sube a la nube si la carga inicial desde la hoja funcionó. Si falló (sin red,
+  // script caído), lo que hay en pantalla puede ser el ejemplo o una copia vieja: subirlo
+  // pisaría los datos reales de la hoja. En ese caso se guarda solo en el navegador.
+  const cloudLoadedRef = useRef(false);
 
   // dispatch que etiqueta cada acción con el mes seleccionado
   const dispatch = useCallback(
@@ -1131,6 +1135,7 @@ export function BudgetProvider({ children }) {
 
       rawDispatch({ type: "LOAD_ALL", payload: byMonth || {} });
       setTemplates(cloudTemplates || readTemplatesBackup() || DEFAULT_GOAL_TEMPLATES.map((t) => ({ ...t })));
+      cloudLoadedRef.current = cloudOk;
       if (!cloudOk) setSyncStatus("error");
       setIsLoading(false);
     }
@@ -1154,6 +1159,12 @@ export function BudgetProvider({ children }) {
     // Respaldo instantáneo en localStorage
     writeLocalBackup(state.byMonth);
     if (templates) writeTemplatesBackup(templates);
+
+    // Carga desde la nube fallida: no subir nada (ver cloudLoadedRef)
+    if (!cloudLoadedRef.current) {
+      setSyncStatus("error");
+      return;
+    }
 
     // Sincronización en segundo plano con Google Sheets.
     // Siempre se envía la foto completa (categorías + plantillas): un script antiguo
