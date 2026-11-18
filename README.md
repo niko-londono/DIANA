@@ -17,9 +17,7 @@ npm run build
 
 ## 🌐 Deploy
 
-El deploy a GitHub Pages se realiza automáticamente mediante GitHub Actions al hacer push a la rama `main`.
-
-**URL**: https://niko-londono.github.io/FINANZAS/
+El deploy se hace en **Vercel** (proyecto `diana`): cada push a `main` publica producción automáticamente. GitHub Pages ya no se usa.
 
 ## 🛠 Tech Stack
 
