@@ -19,6 +19,7 @@
  */
 
 import { useState, useMemo, useRef, useEffect, Fragment } from "react";
+import { createPortal } from "react-dom";
 import "./diana-master.css";
 import {
   useBudget,
@@ -281,6 +282,14 @@ function NavIcon({ type }) {
         </svg>
       );
   }
+}
+
+/**
+ * Los modales se pintan directo en <body>: dentro del contenido con scroll quedaban
+ * por debajo de la barra de navegación inferior (iOS crea ahí otra capa de apilamiento).
+ */
+export function ModalPortal({ children }) {
+  return createPortal(children, document.body);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1398,6 +1407,7 @@ export function AddCategoryModal({ isOpen, onClose, categoryToEdit = null }) {
   if (!isOpen) return null;
 
   return (
+    <ModalPortal>
     <div
       className="modal-overlay active"
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -1521,6 +1531,7 @@ export function AddCategoryModal({ isOpen, onClose, categoryToEdit = null }) {
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
@@ -2220,6 +2231,7 @@ export function GoalTemplateModal({ isOpen, isEditing, initial, onClose, onSave 
   };
 
   return (
+    <ModalPortal>
     <div
       className="modal-overlay active"
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -2305,6 +2317,7 @@ export function GoalTemplateModal({ isOpen, isEditing, initial, onClose, onSave 
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
@@ -2782,6 +2795,7 @@ export function CreditCardModal({ isOpen, onClose, onSave, cardToEdit = null, mo
   if (!isOpen) return null;
 
   return (
+    <ModalPortal>
     <div
       className="modal-overlay active"
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -2867,6 +2881,7 @@ export function CreditCardModal({ isOpen, onClose, onSave, cardToEdit = null, mo
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 

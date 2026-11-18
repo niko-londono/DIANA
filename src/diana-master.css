@@ -1897,8 +1897,45 @@ h1, h2, h3, p {
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr): una columna puede encogerse por debajo del texto de sus
+     opciones (con 1fr, un <select> largo empujaba la fila fuera del modal) */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+}
+
+.form-group {
+  min-width: 0;
+}
+
+.form-input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+select.form-input {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Celular: un campo por fila, legible a 16px, y el modal hace scroll si no cabe */
+@media (max-width: 480px) {
+  .form-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .modal-overlay {
+    padding: 1rem;
+    align-items: center;
+  }
+
+  .modal-card {
+    max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 .modal-footer {
@@ -2606,8 +2643,8 @@ h1, h2, h3, p {
 
 @media (max-width: 480px) {
   .modal-card {
-    width: 92%;
-    margin: 0 1rem;
+    width: 100%; /* el margen lo da el padding del fondo (.modal-overlay) */
+    margin: 0;
     padding: 1.25rem;
   }
 }
@@ -3512,8 +3549,38 @@ h1, h2, h3, p {
     display: none;
   }
 
+  /* Plan mes a mes en celular: la barra de progreso no cabe (el % ya lo dice) y
+     las columnas dejan sus anchos fijos para ajustarse a la pantalla */
+  .th-progress,
   .cell-progress {
-    min-width: 80px;
+    display: none;
+  }
+
+  .schedule-table {
+    width: 100%;
+    table-layout: auto;
+  }
+
+  .schedule-table th,
+  .schedule-table td {
+    width: auto;
+    padding: 0.65rem 0.5rem;
+  }
+
+  .schedule-table th:first-child,
+  .schedule-table td:first-child {
+    padding-left: 0.85rem;
+  }
+
+  .schedule-table th:last-child,
+  .schedule-table td:last-child {
+    padding-right: 0.85rem;
+    text-align: right;
+  }
+
+  .schedule-table thead th {
+    white-space: normal;
+    line-height: 1.25;
   }
 
   .projection-card {
@@ -3529,6 +3596,32 @@ h1, h2, h3, p {
     padding: 1rem;
     gap: 1.1rem;
   }
+}
+
+/* Pantallas muy angostas (iPhone SE de 320px) */
+@media (max-width: 360px) {
+  .schedule-table th,
+  .schedule-table td {
+    padding: 0.55rem 0.3rem;
+    font-size: 0.75rem;
+  }
+
+  .schedule-table th:first-child,
+  .schedule-table td:first-child {
+    padding-left: 0.6rem;
+  }
+
+  .schedule-table th:last-child,
+  .schedule-table td:last-child {
+    padding-right: 0.6rem;
+  }
+
+  .schedule-table .month-number {
+    width: 26px;
+    height: 26px;
+    font-size: 0.75rem;
+  }
+
 }
 
 /* ── 13. ESTILOS DE IMPRESIÓN ── */
