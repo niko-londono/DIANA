@@ -51,7 +51,9 @@ import {
   getCardDate,
   formatShortDate,
   getCardStatus,
-  sortCards
+  sortCards,
+  templateMatchesGoal,
+  TEMPLATE_LABEL_MAX
 } from "./diana-master.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -513,7 +515,7 @@ export function Header() {
           <span className="sync-text">
             {syncStatus === "saving" && "Guardando..."}
             {syncStatus === "saved" && "Sincronizado con la nube"}
-            {syncStatus === "error" && "Sin conexión (Local)"}
+            {syncStatus === "error" && "Sin guardar en la nube (solo local)"}
           </span>
           <CloudIcon size={16} className="sync-cloud-icon" />
         </div>
@@ -1680,45 +1682,12 @@ export function GoalProjectionPage() {
     });
   }, [goalName, targetAmount, currentSavings, termMonths, startDate, annualRate, activeBudgetedSavings, totalIncome]);
 
-  // Presets para facilitar pruebas y uso rápido
-  const PRESETS = [
-    {
-      label: "Ejemplo Excel",
-      goalName: "Meta de ahorro",
-      targetAmount: 90000,
-      currentSavings: 10000,
-      termMonths: 6,
-      startDate: "2026-09-29",
-      annualRate: 0,
-    },
-    {
-      label: "Fondo Emergencia",
-      goalName: "Fondo de Emergencia (6 meses)",
-      targetAmount: 60000,
-      currentSavings: 15000,
-      termMonths: 12,
-      startDate: "2026-10-01",
-      annualRate: 8.5,
-    },
-    {
-      label: "Viaje Europa",
-      goalName: "Vacaciones en Europa",
-      targetAmount: 45000,
-      currentSavings: 5000,
-      termMonths: 8,
-      startDate: "2026-10-01",
-      annualRate: 0,
-    },
-    {
-      label: "Enganche Auto",
-      goalName: "Enganche de Automóvil",
-      targetAmount: 120000,
-      currentSavings: 20000,
-      termMonths: 24,
-      startDate: "2026-10-01",
-      annualRate: 10.0,
-    },
-  ];
+  // Plantillas rápidas: editables y guardadas en la hoja "Plantillas"
+  const { templates, addTemplate, updateTemplate, deleteTemplate } = useBudget();
+  const [isManagingTemplates, setIsManagingTemplates] = useState(false);
+  const [templateModal, setTemplateModal] = useState(null); // null | { mode: "new" } | { mode: "edit", template }
+
+  const currentGoal = { goalName, targetAmount, currentSavings, termMonths, startDate, annualRate };
 
   const handleApplyPreset = (p) => {
     setGoalName(p.goalName);
@@ -1727,6 +1696,22 @@ export function GoalProjectionPage() {
     setTermMonths(p.termMonths);
     setStartDate(p.startDate);
     setAnnualRate(p.annualRate);
+  };
+
+  const handleSaveTemplate = (data) => {
+    if (templateModal && templateModal.mode === "edit") {
+      updateTemplate(templateModal.template.id, data);
+    } else {
+      addTemplate(data);
+    }
+    handleApplyPreset(data);
+    setTemplateModal(null);
+  };
+
+  const handleDeleteTemplate = (t) => {
+    if (window.confirm(`¿Eliminar la plantilla «${t.label}»? Tu meta actual no cambia.`)) {
+      deleteTemplate(t.id);
+    }
   };
 
   const QUICK_MONTHS = [3, 6, 9, 12, 18, 24, 36];
@@ -1744,19 +1729,71 @@ export function GoalProjectionPage() {
             <h2 className="projection-hero-subtitle">Calculadora de metas de ahorro</h2>
           </div>
 
-          <div className="projection-presets-wrapper">
-            <span className="presets-label">Plantillas rápidas</span>
-            <div className="presets-buttons">
-              {PRESETS.map((p) => (
+          <div className={`projection-presets-wrapper ${isManagingTemplates ? "managing" : ""}`}>
+            <div className="presets-label-row">
+              <span className="presets-label">Plantillas rápidas</span>
+              {templates.length > 0 && (
                 <button
-                  key={p.label}
                   type="button"
-                  className={`preset-btn ${goalName === p.goalName ? "active" : ""}`}
-                  onClick={() => handleApplyPreset(p)}
+                  className="presets-manage-btn"
+                  onClick={() => setIsManagingTemplates((v) => !v)}
+                  aria-pressed={isManagingTemplates}
                 >
-                  {p.label}
+                  {isManagingTemplates ? "Listo" : "Editar"}
                 </button>
-              ))}
+              )}
+            </div>
+            <div className="presets-buttons">
+              {templates.map((p) =>
+                isManagingTemplates ? (
+                  <span key={p.id} className="preset-chip-edit">
+                    <button
+                      type="button"
+                      className="preset-chip-main"
+                      onClick={() => setTemplateModal({ mode: "edit", template: p })}
+                      aria-label={`Editar plantilla ${p.label}`}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                      {p.label}
+                    </button>
+                    <button
+                      type="button"
+                      className="preset-chip-delete"
+                      onClick={() => handleDeleteTemplate(p)}
+                      aria-label={`Eliminar plantilla ${p.label}`}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`preset-btn ${templateMatchesGoal(p, currentGoal) ? "active" : ""}`}
+                    onClick={() => handleApplyPreset(p)}
+                    title={`${p.goalName} · ${formatCurrency(p.targetAmount)} en ${p.termMonths} ${p.termMonths === 1 ? "mes" : "meses"}`}
+                  >
+                    {p.label}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                className="preset-btn preset-btn-add"
+                onClick={() => setTemplateModal({ mode: "new" })}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Nueva
+              </button>
             </div>
           </div>
         </div>
@@ -2110,6 +2147,162 @@ export function GoalProjectionPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <GoalTemplateModal
+        isOpen={templateModal !== null}
+        isEditing={templateModal?.mode === "edit"}
+        initial={templateModal?.mode === "edit" ? templateModal.template : { ...currentGoal, label: "" }}
+        onClose={() => setTemplateModal(null)}
+        onSave={handleSaveTemplate}
+      />
+    </div>
+  );
+}
+
+/**
+ * Crear o editar una plantilla rápida de meta.
+ * Al crear, parte de los valores que ya están en la calculadora.
+ */
+export function GoalTemplateModal({ isOpen, isEditing, initial, onClose, onSave }) {
+  const [form, setForm] = useState(initial);
+  const [error, setError] = useState("");
+  const labelRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setForm({
+      label: initial.label ?? "",
+      goalName: initial.goalName ?? "",
+      targetAmount: String(initial.targetAmount ?? ""),
+      currentSavings: String(initial.currentSavings ?? "0"),
+      termMonths: String(initial.termMonths ?? "12"),
+      startDate: initial.startDate ?? "",
+      annualRate: String(initial.annualRate ?? "0"),
+    });
+    setError("");
+    const id = setTimeout(() => labelRef.current && labelRef.current.focus(), 50);
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener("keydown", onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const target = Number(form.targetAmount);
+    const current = Number(form.currentSavings || 0);
+    const months = Number(form.termMonths);
+    const rate = Number(form.annualRate || 0);
+    if (!form.label.trim()) return setError("Ponle un nombre al botón.");
+    if (!form.goalName.trim()) return setError("Escribe el nombre de la meta.");
+    if (!Number.isFinite(target) || target <= 0) return setError("La meta debe ser mayor a $0.");
+    if (!Number.isFinite(current) || current < 0) return setError("El ahorro actual no puede ser negativo.");
+    if (!Number.isInteger(months) || months < 1 || months > 600) return setError("El plazo debe ser de 1 a 600 meses, en número entero.");
+    if (!form.startDate) return setError("Elige la fecha de inicio.");
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) return setError("La tasa anual debe estar entre 0% y 100%.");
+    onSave({
+      label: form.label.trim(),
+      goalName: form.goalName.trim(),
+      targetAmount: target,
+      currentSavings: current,
+      termMonths: months,
+      startDate: form.startDate,
+      annualRate: rate,
+    });
+  };
+
+  return (
+    <div
+      className="modal-overlay active"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      id="goal-template-modal"
+    >
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="tpl-modal-title">
+        <div className="modal-header">
+          <h3 id="tpl-modal-title">{isEditing ? "Editar plantilla" : "Nueva plantilla"}</h3>
+          <button className="modal-close" onClick={onClose} aria-label="Cerrar" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="modal-body">
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="tpl-label">Nombre del botón</label>
+                <input ref={labelRef} id="tpl-label" type="text" className="form-input" placeholder="Ej. Viaje Japón"
+                  value={form.label} onChange={set("label")} maxLength={TEMPLATE_LABEL_MAX} autoComplete="off" />
+              </div>
+              <div className="form-group">
+                <label htmlFor="tpl-goal">Nombre de la meta</label>
+                <input id="tpl-goal" type="text" className="form-input" placeholder="Ej. Vacaciones en Japón"
+                  value={form.goalName} onChange={set("goalName")} maxLength={80} autoComplete="off" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="tpl-target">Meta total ($)</label>
+                <input id="tpl-target" type="number" inputMode="decimal" min="0" step="any" className="form-input"
+                  value={form.targetAmount} onChange={set("targetAmount")} />
+              </div>
+              <div className="form-group">
+                <label htmlFor="tpl-current">Ahorro actual ($)</label>
+                <input id="tpl-current" type="number" inputMode="decimal" min="0" step="any" className="form-input"
+                  value={form.currentSavings} onChange={set("currentSavings")} />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="tpl-months">Plazo (meses)</label>
+                <input id="tpl-months" type="number" inputMode="numeric" min="1" max="600" step="1" className="form-input"
+                  value={form.termMonths} onChange={set("termMonths")} />
+              </div>
+              <div className="form-group">
+                <label htmlFor="tpl-rate">Rendimiento anual (%)</label>
+                <input id="tpl-rate" type="number" inputMode="decimal" min="0" max="100" step="any" className="form-input"
+                  value={form.annualRate} onChange={set("annualRate")} />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="tpl-date">Fecha de inicio</label>
+              <input id="tpl-date" type="date" className="form-input"
+                value={form.startDate} onChange={set("startDate")} />
+            </div>
+
+            {error ? (
+              <p className="form-error" role="alert">{error}</p>
+            ) : (
+              <p className="form-hint">
+                {isEditing
+                  ? "Los cambios se guardan en la hoja «Plantillas» y se aplican a la calculadora."
+                  : "Parte de los valores actuales de la calculadora. Se guarda en la hoja «Plantillas»."}
+              </p>
+            )}
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primary">
+              {isEditing ? "Guardar cambios" : "Crear plantilla"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

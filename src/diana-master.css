@@ -2783,6 +2783,103 @@ h1, h2, h3, p {
   color: var(--accent-on-dark);
 }
 
+/* Plantillas editables */
+.presets-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.presets-manage-btn {
+  background: none;
+  border: none;
+  padding: 0.15rem 0.1rem;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-on-dark);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(140, 199, 163, 0.35);
+  text-underline-offset: 3px;
+  touch-action: manipulation;
+}
+
+.presets-manage-btn:hover {
+  text-decoration-color: currentColor;
+}
+
+.preset-btn-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-style: dashed;
+  color: #b9b5aa;
+}
+
+.preset-chip-edit {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  animation: scaleIn 0.16s var(--ease-out);
+}
+
+.preset-chip-main,
+.preset-chip-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  color: #e8e5dc;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.preset-chip-main {
+  padding: 0.35rem 0.6rem 0.35rem 0.7rem;
+}
+
+.preset-chip-delete {
+  padding: 0 0.55rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  color: #d99a8b;
+}
+
+.preset-chip-main:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.preset-chip-delete:hover {
+  background: rgba(181, 69, 47, 0.28);
+  color: #ffd9cf;
+}
+
+.preset-chip-main:active,
+.preset-chip-delete:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.form-error {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  font-weight: 600;
+  color: var(--color-danger, #b5452f);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preset-chip-edit { animation: none; }
+}
+
 /* Alertas de compatibilidad */
 .projection-alert {
   display: flex;

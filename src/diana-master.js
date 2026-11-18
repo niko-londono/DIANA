@@ -350,6 +350,94 @@ export const DEFAULT_GOAL = {
   annualRate: 0,
 };
 
+// ── Plantillas rápidas de metas (editables, se guardan en la hoja "Plantillas") ──
+
+export const TEMPLATES_STORAGE_KEY = "finanzas_plantillas";
+export const TEMPLATE_LABEL_MAX = 28;
+
+export const DEFAULT_GOAL_TEMPLATES = [
+  { id: "tpl-ejemplo", label: "Ejemplo Excel", goalName: "Meta de ahorro", targetAmount: 90000, currentSavings: 10000, termMonths: 6, startDate: "2026-09-29", annualRate: 0 },
+  { id: "tpl-emergencia", label: "Fondo Emergencia", goalName: "Fondo de Emergencia (6 meses)", targetAmount: 60000, currentSavings: 15000, termMonths: 12, startDate: "2026-10-01", annualRate: 8.5 },
+  { id: "tpl-europa", label: "Viaje Europa", goalName: "Vacaciones en Europa", targetAmount: 45000, currentSavings: 5000, termMonths: 8, startDate: "2026-10-01", annualRate: 0 },
+  { id: "tpl-auto", label: "Enganche Auto", goalName: "Enganche de Automóvil", targetAmount: 120000, currentSavings: 20000, termMonths: 24, startDate: "2026-10-01", annualRate: 10 },
+];
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function cleanNumber(value, { min = 0, max = Infinity, integer = false } = {}) {
+  let n = Number(value);
+  if (!Number.isFinite(n)) n = min;
+  if (integer) n = Math.round(n);
+  return Math.min(max, Math.max(min, n));
+}
+
+/**
+ * Deja una plantilla siempre válida (venga de la hoja, del navegador o del formulario):
+ * números finitos y no negativos, plazo entero de 1 a 600 meses, fecha YYYY-MM-DD real
+ * y textos recortados.
+ */
+export function normalizeTemplate(t = {}) {
+  const goalName = String(t.goalName ?? "").trim().slice(0, 80) || "Meta de ahorro";
+  const label = String(t.label ?? "").trim().slice(0, TEMPLATE_LABEL_MAX) || goalName.slice(0, TEMPLATE_LABEL_MAX);
+  const rawDate = String(t.startDate ?? "").slice(0, 10);
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && !Number.isNaN(new Date(`${rawDate}T00:00:00`).getTime());
+  return {
+    id: String(t.id ?? "").trim() || `tpl-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    label,
+    goalName,
+    targetAmount: cleanNumber(t.targetAmount, { max: 1e12 }),
+    currentSavings: cleanNumber(t.currentSavings, { max: 1e12 }),
+    termMonths: cleanNumber(t.termMonths, { min: 1, max: 600, integer: true }),
+    startDate: validDate ? rawDate : todayISO(),
+    annualRate: cleanNumber(t.annualRate, { max: 100 }),
+  };
+}
+
+/** Normaliza una lista y descarta ids repetidos (se queda con el primero). null si no es lista. */
+export function normalizeTemplateList(list) {
+  if (!Array.isArray(list)) return null;
+  const seen = new Set();
+  return list.map(normalizeTemplate).filter((t) => {
+    if (seen.has(t.id)) return false;
+    seen.add(t.id);
+    return true;
+  });
+}
+
+/** ¿El formulario de la meta coincide exactamente con esta plantilla? */
+export function templateMatchesGoal(t, goal) {
+  return (
+    t.goalName === goal.goalName &&
+    Number(t.targetAmount) === Number(goal.targetAmount) &&
+    Number(t.currentSavings) === Number(goal.currentSavings) &&
+    Number(t.termMonths) === Number(goal.termMonths) &&
+    t.startDate === goal.startDate &&
+    Number(t.annualRate) === Number(goal.annualRate)
+  );
+}
+
+function readTemplatesBackup() {
+  try {
+    const raw = localStorage.getItem(TEMPLATES_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return normalizeTemplateList(parsed && parsed.templates);
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeTemplatesBackup(templates) {
+  try {
+    localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify({ version: 1, templates }));
+  } catch (e) {
+    console.warn("No se pudieron guardar las plantillas localmente:", e);
+  }
+}
+
 /**
  * Suma meses a una fecha respetando el día del mes o ajustando al último día válido
  */
@@ -1006,6 +1094,7 @@ export function BudgetProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState("saved"); // "saved", "saving", "error"
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey); // "YYYY-MM"
+  const [templates, setTemplates] = useState(null); // plantillas de metas (null hasta cargar)
   const isFirstRender = useRef(true);
 
   // dispatch que etiqueta cada acción con el mes seleccionado
@@ -1021,13 +1110,18 @@ export function BudgetProvider({ children }) {
 
     async function fetchData() {
       let byMonth = null;
+      let cloudTemplates = null;
+      let cloudOk = false;
       try {
         const response = await fetch(SCRIPT_URL);
         const data = await response.json();
-        if (data && Array.isArray(data.categories) && data.categories.length > 0) {
-          byMonth = deserializeRows(data.categories, legacyMonthKey);
-        } else if (data && data.error) {
+        if (data && data.error) {
           console.warn("Respuesta de Google Sheets:", data.error);
+        } else if (data && Array.isArray(data.categories)) {
+          cloudOk = true;
+          if (data.categories.length > 0) byMonth = deserializeRows(data.categories, legacyMonthKey);
+          // null/ausente = la hoja "Plantillas" aún no existe (script antiguo o primera vez)
+          cloudTemplates = normalizeTemplateList(data.templates);
         }
       } catch (e) {
         console.error("Error al cargar desde Google Sheets:", e);
@@ -1036,6 +1130,8 @@ export function BudgetProvider({ children }) {
       if (!byMonth) byMonth = readLocalBackup(legacyMonthKey);
 
       rawDispatch({ type: "LOAD_ALL", payload: byMonth || {} });
+      setTemplates(cloudTemplates || readTemplatesBackup() || DEFAULT_GOAL_TEMPLATES.map((t) => ({ ...t })));
+      if (!cloudOk) setSyncStatus("error");
       setIsLoading(false);
     }
     fetchData();
@@ -1057,23 +1153,36 @@ export function BudgetProvider({ children }) {
 
     // Respaldo instantáneo en localStorage
     writeLocalBackup(state.byMonth);
+    if (templates) writeTemplatesBackup(templates);
 
-    // Sincronización en segundo plano con Google Sheets
+    // Sincronización en segundo plano con Google Sheets.
+    // Siempre se envía la foto completa (categorías + plantillas): un script antiguo
+    // ignora "templates" y nunca recibe un envío sin categorías que borre la hoja.
     setSyncStatus("saving");
+    let cancelled = false;
     async function syncData() {
       try {
-        await fetch(SCRIPT_URL, {
+        const response = await fetch(SCRIPT_URL, {
           method: "POST",
-          mode: "no-cors",
           headers: {
             "Content-Type": "text/plain;charset=utf-8",
           },
-          body: JSON.stringify({ categories: serializeByMonth(state.byMonth) })
+          body: JSON.stringify({
+            categories: serializeByMonth(state.byMonth),
+            ...(templates ? { templates } : {}),
+          })
         });
-        setSyncStatus("saved");
+        const result = await response.json().catch(() => null);
+        if (cancelled) return;
+        if (!result || result.error) {
+          console.warn("Google Sheets no confirmó el guardado:", result && result.error);
+          setSyncStatus("error");
+        } else {
+          setSyncStatus("saved");
+        }
       } catch (e) {
         console.error("Error al sincronizar con Google Sheets:", e);
-        setSyncStatus("error");
+        if (!cancelled) setSyncStatus("error");
       }
     }
 
@@ -1081,8 +1190,26 @@ export function BudgetProvider({ children }) {
       syncData();
     }, 1000);
 
-    return () => clearTimeout(timeoutId);
-  }, [state.byMonth, isLoading]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [state.byMonth, templates, isLoading]);
+
+  // Acciones de plantillas (siempre validadas con normalizeTemplate)
+  const addTemplate = useCallback((data) => {
+    const tpl = normalizeTemplate({ ...data, id: "" });
+    setTemplates((list) => [...(list || []), tpl]);
+    return tpl;
+  }, []);
+
+  const updateTemplate = useCallback((id, data) => {
+    setTemplates((list) => (list || []).map((t) => (t.id === id ? normalizeTemplate({ ...t, ...data, id }) : t)));
+  }, []);
+
+  const deleteTemplate = useCallback((id) => {
+    setTemplates((list) => (list || []).filter((t) => t.id !== id));
+  }, []);
 
   // Valores Computados (siempre del mes seleccionado)
   const categories = useMemo(
@@ -1127,6 +1254,10 @@ export function BudgetProvider({ children }) {
         selectedMonthLabel: formatMonthLabel(selectedMonth),
         monthsWithData,
         byMonth: state.byMonth,
+        templates: templates || [],
+        addTemplate,
+        updateTemplate,
+        deleteTemplate,
       }
     },
     children
