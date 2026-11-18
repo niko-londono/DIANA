@@ -201,7 +201,10 @@ h1, h2, h3, p {
 }
 
 .overview-container > *:not(.modal-overlay) {
-  animation: riseIn 0.6s var(--ease-out) both;
+  /* backwards (no both): al terminar la animación no queda aplicada, así
+     cada bloque deja de ser un contexto de apilamiento propio y los
+     desplegables del encabezado y del hero pueden quedar por encima. */
+  animation: riseIn 0.6s var(--ease-out) backwards;
 }
 .overview-container > *:nth-child(2) { animation-delay: 0.05s; }
 .overview-container > *:nth-child(3) { animation-delay: 0.1s; }
@@ -445,6 +448,11 @@ h1, h2, h3, p {
 
 /* ── 5. BARRA SUPERIOR (HEADER) ── */
 .dashboard-topbar {
+  /* Encima de todo el contenido del resumen: el calendario de mes cuelga
+     de aquí y debe tapar el hero y las tarjetas, incluso durante la
+     animación de entrada. */
+  position: relative;
+  z-index: var(--z-popover);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -759,6 +767,9 @@ h1, h2, h3, p {
 
 /* ── 6. SECCIÓN RESUMEN HERO (BUDGETHERO) ── */
 .budget-hero-section {
+  /* Por debajo del encabezado, por encima de tarjetas (menú «⋯») */
+  position: relative;
+  z-index: var(--z-dropdown);
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
