@@ -25,7 +25,12 @@ src/
 - [`src/index.css`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/src/index.css): Archivo puente que importa `diana-master.css`.
 - [`src/context/BudgetContext.jsx`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/src/context/BudgetContext.jsx) y [`src/utils/formatters.js`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/src/utils/formatters.js): Re-exportan desde `diana-master.js` para compatibilidad retroactiva.
 - [`Code.gs`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/Code.gs): Código del backend en Google Apps Script para interactuar con Google Sheets.
-- [`vite.config.js`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/vite.config.js): Configuración de Vite con `base: "/DIANA/"` para GitHub Pages.
+- [`vite.config.js`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/vite.config.js): Configuración de Vite con `base: "/"` (despliegue en Vercel desde v1.14.0; antes `"/DIANA/"` para GitHub Pages).
+
+### Despliegue
+- **Vercel** (proyecto `diana`, dominio `*.vercel.app`): cada push a `main` publica producción automáticamente.
+- GitHub Pages ya no se usa (el workflow `.github/workflows/deploy.yml` se eliminó en v1.14.0).
+- Los cambios de `Code.gs` **no** se despliegan con Vercel: hay que pegarlos en Apps Script y publicar una nueva versión de la implementación existente.
 
 ---
 
@@ -40,15 +45,16 @@ src/
    - Lanza petición `GET` a `SCRIPT_URL`.
    - Si la red responde con categorías válidas, las agrupa por mes (`deserializeRows`), actualiza el estado y guarda en `localStorage` (`finanzas_backup`, formato `{ version: 2, byMonth }`; también lee el formato antiguo de arreglo plano).
    - Si falla o la hoja está vacía, realiza fallback automático a `localStorage` y finalmente a `DEFAULT_CATEGORIES`.
+   - **Protección (v1.14.1)**: si el `GET` inicial falló, la app **no sube nada** a la hoja en esa sesión (solo guarda en el navegador y muestra "Sin guardar en la nube"). Así una copia local vieja o el presupuesto de ejemplo nunca pisan los datos reales de la hoja (riesgo típico al abrir la app en un dominio nuevo sin copia local).
 - **Backend v2 + plantillas editables (v1.13.0)**: `Code.gs` reescrito. Crea solas las hojas que falten (busca "Categorias" ignorando tildes/mayúsculas), guarda además `type`, `subtext` e `icon` (columnas 7-9) y añade la hoja **`Plantillas`** (`id, label, goalName, targetAmount, currentSavings, termMonths, startDate, annualRate`). `doGet` devuelve `{ version: 2, categories, templates }` (`templates: null` si la hoja no existe). `doPost` solo reescribe la hoja cuya lista viene en el payload, nunca borra categorías con una lista vacía y usa `LockService`. La app siempre envía categorías + plantillas juntas, lee la respuesta del POST (ya no usa `no-cors`) y muestra "Sin guardar en la nube" si el script no confirma. Plantillas: respaldo local en `finanzas_plantillas`; se validan con `normalizeTemplate`. **Requiere pegar el nuevo `Code.gs` en Apps Script y publicar una nueva versión de la implementación existente.**
 - **Tarjetas (v1.11.0)**: se guardan **solo en `localStorage`** (clave `finanzas_tarjetas`, formato `{ version: 1, byMonth }`). No viajan a Google Sheets porque `Code.gs` solo maneja las 6 columnas de categorías; sincronizarlas en la nube requeriría ampliar `Code.gs` (p. ej. una hoja `Tarjetas`).
 3. **Persistencia Automática (`syncData`)**:
    - Al mutar cualquier categoría, guarda de inmediato en `localStorage` (cero pérdida de datos).
-   - Ejecuta un guardado asíncrono con **debounce de 1000ms** hacia Google Sheets mediante `POST` con `mode: "no-cors"` y `headers: { "Content-Type": "text/plain;charset=utf-8" }`.
+   - Ejecuta un guardado asíncrono con **debounce de 1000ms** hacia Google Sheets mediante `POST` con `headers: { "Content-Type": "text/plain;charset=utf-8" }`. Desde v1.13.0 ya **no** usa `no-cors`: lee la respuesta del script y envía siempre categorías + plantillas juntas.
    - Estados de sincronización visibles en tiempo real en el Header:
      - `saved`: Sincronizado con la nube (punto verde).
      - `saving`: Guardando... (punto ámbar parpadeante).
-     - `error`: Sin conexión / Local (punto rojo).
+     - `error`: Sin guardar en la nube / Local (punto rojo): el script no confirmó o la carga inicial falló.
 
 ---
 
@@ -56,8 +62,13 @@ src/
 
 - **Metodología Base Cero**:  
   $$\text{Ingresos (Sueldo + Ingresos Extra)} - \text{Total Asignado (Gastos)} = \text{Diferencia ($0.00)}$$
-- **Presupuesto Independiente por Mes**:
-  El estado es `byMonth = { "2026-10": [...], "2026-11": [...] }`. Todo lo que se edita, crea, elimina o restablece afecta únicamente al mes seleccionado. Al abrir un mes por primera vez (`ENSURE_MONTH`) se crea como **copia independiente** del mes anterior más cercano con datos (si no hay, del siguiente; si no, de `DEFAULT_CATEGORIES`). Después de creado ya no se sincroniza con ningún otro mes.
+- **Presupuesto por Mes con herencia hacia adelante (v1.15.0)**:
+  El estado es `byMonth = { "2026-10": [...], "2026-11": [...] }`. Al abrir un mes por primera vez (`ENSURE_MONTH`) se crea como copia del mes anterior más cercano con datos (si no hay, del siguiente; si no, de `DEFAULT_CATEGORIES`).
+  - **Crear, editar o borrar** una categoría (`ADD_CATEGORY`, `UPDATE_CATEGORY`, `UPDATE_BUDGET`, `UPDATE_NAME`, `DELETE_CATEGORY`) se aplica al mes seleccionado **y a los meses posteriores ya guardados** (`propagateForward` en `diana-master.js`).
+  - La propagación de una categoría **se detiene** en el primer mes posterior donde esa categoría ya se había editado por su cuenta (su configuración difiere de la que tenía el mes editado antes del cambio); desde ahí manda ese mes.
+  - **Nunca** toca meses anteriores. Expandir/contraer y "Restablecer plantilla" (`RESET`) siguen afectando solo al mes seleccionado.
+  - Campos que cuentan como configuración: `name`, `budgeted`, `parentId`, `type`, `subtext`, `icon`, `canDelete` (`expanded` es solo visual).
+- **Mes actual al volver (v1.15.0)**: la app abre en el mes actual y también regresa a él al volver a primer plano si cambió el mes o estuvo oculta ≥ 15 min, al restaurarse desde la caché del navegador (`pageshow`) y al cruzar de mes con la app abierta.
 - **Ingresos Extra (categorías tipo "Ingreso Base")**:
   Una categoría principal (`parentId: null`) con tipo **Ingreso Base** se **suma** al ingreso total en lugar de contarse como gasto (función `isIncomeCategory` en `diana-master.js`). `totalIncome` = Sueldo + esas categorías; `totalExpenses` excluye a todas ellas. Las subcategorías nunca suman. El porcentaje de cada fila se calcula sobre el ingreso total.
 - **Prevención de Doble Conteo**:  
@@ -80,14 +91,17 @@ src/
 | Componente | Función |
 | :--- | :--- |
 | `DianaApp` | Componente raíz, envuelve en `BudgetProvider`, gestiona navegación y sidebar. |
-| `Sidebar` | Barra lateral con logo, navegación, botón de colapso de escritorio y menú hamburguesa móvil. |
+| `Sidebar` | Barra lateral con logo, navegación y botón de colapso. Solo en PC (> 1024px). |
+| `BottomNav` | Barra de navegación inferior tipo app con las 6 secciones, en celular y tablet (≤ 1024px). Tocar la sección activa vuelve arriba. |
 | `Header` | Barra superior con título, badge de sincronización y `MonthPicker`. |
 | `MonthPicker` | Calendario solo de meses y años (cuadrícula 3×4, flechas de año, botón "Mes actual", punto en meses con presupuesto). Cierra con Escape o clic fuera. |
 | `BudgetHero` | Cabecera con badge de balance cero/superávit/déficit, exportación CSV y botón "Nueva Categoría". |
 | `MetricCards` | Cuadrícula de 4 tarjetas: Ingreso Base, Gastos M, Viajes & Vacaciones y Fondo de Ahorro. |
 | `AllocationBar` | Barra multisegmento que visualiza el porcentaje que representa cada categoría sobre el sueldo. |
 | `BudgetTable` | Tabla completa con buscador, desglose por categorías, subcategorías y fila de Sueldo Cuadre. |
-| `AddCategoryModal` | Modal reutilizable para crear y editar categorías o subcategorías. |
+| `AddCategoryModal` | Modal reutilizable para crear y editar categorías o subcategorías. Se monta en `<body>` (portal). |
+| `GoalProjectionPage` | Pestaña Proyección: meta de ahorro (monto, ahorro actual, plazo, fecha de inicio, rendimiento anual), plantillas rápidas, compatibilidad con el presupuesto y plan mes a mes. |
+| `GoalTemplateModal` | Modal para crear y editar plantillas de metas (se guardan en la hoja `Plantillas`). |
 | `PlaceholderPage` | Vistas en construcción para las pestañas de navegación secundaria. |
 | `DistributionPage` | Pestaña Distribución: gráfica de barras apiladas por mes (ganancia + reparto por categoría), vista $ / %, KPIs del año, detalle del mes y tabla resumen. |
 | `CardsPage` / `CreditCardModal` | Pestaña Tarjetas: tarjetas del mes con fecha de corte, vencimiento, estado de pago (botón pagada / deshacer), editar y eliminar. El modal sirve para crear y editar. |
@@ -96,6 +110,38 @@ src/
 ---
 
 ## 📝 5. Historial de Cambios y Actualizaciones
+
+### [v1.16.1] — 2026-11-17 (Campo de fecha en iPhone)
+- **Fecha de inicio en Proyección** (`diana-master.css`): en iOS Safari el `<input type="date">` nativo ignoraba `width: 100%` (tiene un ancho mínimo propio), se salía de la tarjeta por la derecha, centraba el texto y crecía en alto. Ahora `input[type="date"].goal-input` y `.form-input` usan `appearance: none`, `min-width: 0`, `max-width: 100%`, la misma altura que el resto de campos y el valor alineado a la izquierda (`::-webkit-date-and-time-value`). Aplica también al campo de fecha del modal de plantillas.
+- Pendiente de comprobar en un iPhone real (el fallo no se reproduce en navegadores de escritorio).
+
+### [v1.16.0] — 2026-11-17 (Navegación inferior tipo app y desbordes en celular)
+- **Navegación inferior** (`BottomNav`): hasta 1024px se ocultan el menú lateral, su botón y su fondo, y la navegación pasa a una barra fija abajo con las 6 secciones (Resumen, Proyección, Distribución, Tarjetas, Ajustes, Notas), respetando la zona segura del iPhone. Cambiar de sección empieza arriba; tocar la sección activa vuelve arriba. En PC (> 1024px) se mantiene el menú lateral.
+- **Modales**: se montan en `<body>` con un portal para no quedar debajo de la barra inferior. Formularios con columnas `minmax(0, 1fr)` y campos al 100% (los `<select>` largos sacaban la fila del modal); a ≤ 480px un campo por fila y el modal hace scroll si no cabe.
+- **Plan mes a mes (Proyección)**: en celular se oculta la barra de progreso (el % ya lo indica) y la tabla se ajusta al ancho, también a 320px.
+- **Barra superior pegada al borde** en móvil: el contenedor con scroll tenía 0.65rem de padding superior y el contenido asomaba por encima de la barra sticky.
+
+### [v1.15.0] — 2026-11-17 (Herencia de cambios entre meses y volver al mes actual)
+- **Los cambios de un mes se mantienen en los siguientes** (`propagateForward`, `budgetReducer`): ver reglas en la sección 3. Antes cada mes era una copia totalmente independiente.
+- **Volver al mes actual** al regresar a la app (`visibilitychange`, `pageshow` y cambio de mes con la app abierta). Motivo: en el celular la pestaña quedaba suspendida y mostraba el último mes visto.
+
+### [v1.14.1] — 2026-11-17 (No sobrescribir la hoja si la carga inicial falló)
+- Si el `GET` a Google Sheets falla, la app trabaja con la copia local o el presupuesto de ejemplo **sin subirlos** a la hoja y marca "Sin guardar en la nube" (`diana-master.js`).
+
+### [v1.14.0] — 2026-11-17 (Despliegue en Vercel)
+- Migración de GitHub Pages a **Vercel** (proyecto `diana`): `base` de Vite pasa a `"/"`, se elimina `.github/workflows/deploy.yml` y el README describe el nuevo despliegue.
+
+### [v1.13.0] — 2026-11-17 (Plantillas de metas editables y backend v2 de Google Sheets)
+- **Plantillas rápidas en Proyección**: crear, editar y borrar (`GoalTemplateModal`), validadas con `normalizeTemplate` y con respaldo local en `finanzas_plantillas`.
+- **`Code.gs` v2**: recrea las hojas que falten, guarda `type`, `subtext` e `icon`, añade la hoja `Plantillas`; `doPost` solo reescribe las listas recibidas, nunca borra categorías con una lista vacía y usa `LockService`. Detalle en la sección 2.
+- La app envía categorías + plantillas juntas y lee la respuesta del POST (muestra "Sin guardar en la nube" si el script no confirma).
+- **Requiere** pegar el nuevo `Code.gs` en Apps Script y publicar una nueva versión de la implementación.
+
+### [v1.12.1] — 2026-11-17 (Ajustes de UI móvil y calendario)
+- **Zonas seguras del iPhone** (`index.html`, `diana-master.css`): `viewport-fit=cover`, altura `100dvh`, `theme-color` igual a la cabecera; cabecera, botón de menú y drawer respetan el notch. Final de página con el mismo margen que los laterales más la zona segura inferior.
+- Se quitó la sombra del menú lateral cerrado (franja oscura a la izquierda) y se oculta la barra de scroll en móvil.
+- Inputs a 16px en móvil para evitar el zoom automático de iOS.
+- **Calendario de mes detrás del hero**: la animación `riseIn` usaba `fill-mode: both` y atrapaba el `z-index` del calendario; ahora usa `backwards` y cabecera y hero tienen `z-index` explícito (calendario y menú «⋯» quedan encima de las tarjetas).
 
 ### [v1.12.0] — 2026-10-18 (Rediseño visual "libro contable")
 - **Tipografía** (`index.html`, `diana-master.css`): Inter reemplazada por **Geist** (UI), **Instrument Serif** (títulos y montos grandes, `--font-display`) y **Geist Mono** (cifras de tabla y porcentajes, `--font-mono`). Cifras con `tabular-nums`; títulos con `text-wrap: balance`.
@@ -208,7 +254,7 @@ src/
 ### [v1.0.0] — 2026-09-03 (Configuración Inicial de la Aplicación)
 - Proyecto base en React 18 + Vite 5 + Vanilla CSS.
 - Estructura inicial de presupuesto con ingreso y categorías principales.
-- Configuración para despliegue automatizado en GitHub Pages.
+- Configuración para despliegue automatizado en GitHub Pages (reemplazado por Vercel en v1.14.0).
 
 ---
 
