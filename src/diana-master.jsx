@@ -18,7 +18,7 @@
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
-import { useState, useMemo, useRef, useEffect, Fragment } from "react";
+import { useState, useMemo, useRef, useEffect, Fragment, createContext, useContext } from "react";
 import { createPortal } from "react-dom";
 import "./diana-master.css";
 import {
@@ -54,7 +54,8 @@ import {
   getCardStatus,
   sortCards,
   templateMatchesGoal,
-  TEMPLATE_LABEL_MAX
+  TEMPLATE_LABEL_MAX,
+  useTheme
 } from "./diana-master.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -140,6 +141,23 @@ export function PlusIcon({ className = "", size = 16 }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+export function SunIcon({ className = "", size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </svg>
+  );
+}
+
+export function MoonIcon({ className = "", size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />
     </svg>
   );
 }
@@ -505,6 +523,97 @@ export function MonthPicker() {
   );
 }
 
+// ── Tema claro / oscuro ──
+export const ThemeContext = createContext({ theme: "light", toggleTheme: () => {} });
+
+export function ThemeToggle() {
+  const { theme, toggleTheme } = useContext(ThemeContext);
+  const isDark = theme === "dark";
+  const label = isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+  return (
+    <button
+      type="button"
+      className={`theme-toggle ${isDark ? "is-dark" : ""}`}
+      onClick={toggleTheme}
+      aria-label={label}
+      title={label}
+      id="theme-toggle"
+    >
+      <span className="theme-toggle-icons">
+        <SunIcon size={16} className="theme-icon theme-icon-sun" />
+        <MoonIcon size={16} className="theme-icon theme-icon-moon" />
+      </span>
+    </button>
+  );
+}
+
+// ── Pantalla de carga inicial (mientras se trae el presupuesto de la nube) ──
+// Esfera adaptada de "young-walrus-64" de Andrew Manzyk (uiverse.io, licencia MIT),
+// con los colores de la app. La forma interna usa una máscara SVG con filtro
+// "gooey" nativo para que funcione también en Safari de iPhone.
+const LOADER_MIN_MS = 900;   // evita un destello si la nube responde muy rápido
+const LOADER_EXIT_MS = 520;  // duración del desvanecido de salida
+
+export function AppLoader() {
+  const { isLoading } = useBudget();
+  const [phase, setPhase] = useState("visible"); // visible → leaving → gone
+  const startRef = useRef(Date.now());
+
+  useEffect(() => {
+    if (isLoading) return undefined;
+    const wait = Math.max(0, LOADER_MIN_MS - (Date.now() - startRef.current));
+    const t1 = setTimeout(() => setPhase("leaving"), wait);
+    const t2 = setTimeout(() => setPhase("gone"), wait + LOADER_EXIT_MS);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [isLoading]);
+
+  if (phase === "gone") return null;
+
+  return (
+    <div className={`app-loader ${phase === "leaving" ? "is-leaving" : ""}`} role="status" aria-live="polite">
+      <div className="orb" aria-hidden="true">
+        <svg className="orb-core" viewBox="0 0 100 100" width="100" height="100">
+          <defs>
+            <linearGradient id="orb-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="30%" className="orb-stop-one" />
+              <stop offset="70%" className="orb-stop-two" />
+            </linearGradient>
+            <filter id="orb-goo" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="7" />
+              <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -6">
+                <animate
+                  attributeName="values"
+                  dur="1s"
+                  repeatCount="indefinite"
+                  keyTimes="0;0.2;0.4;0.6;1"
+                  values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -6;
+                          1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 4 -1.2;
+                          1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 4 -1.2;
+                          1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -6;
+                          1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -6"
+                />
+              </feColorMatrix>
+            </filter>
+            <mask id="orb-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+              <g filter="url(#orb-goo)" fill="#fff">
+                <polygon className="orb-p1" points="25,25 75,25 50,75" />
+                <polygon className="orb-p2" points="50,25 75,75 25,75" />
+                <polygon className="orb-p3" points="35,35 65,35 50,65" />
+                <polygon className="orb-p4" points="35,35 65,35 50,65" />
+                <polygon className="orb-p5" points="35,35 65,35 50,65" />
+                <polygon className="orb-p6" points="35,35 65,35 50,65" />
+              </g>
+            </mask>
+          </defs>
+          <rect width="100" height="100" fill="url(#orb-fill)" mask="url(#orb-mask)" />
+        </svg>
+      </div>
+      <p className="app-loader-title">Preparando tu presupuesto</p>
+      <p className="app-loader-text">Sincronizando con la nube…</p>
+    </div>
+  );
+}
+
 export function Header() {
   const { syncStatus } = useBudget();
 
@@ -528,6 +637,8 @@ export function Header() {
           </span>
           <CloudIcon size={16} className="sync-cloud-icon" />
         </div>
+
+        <ThemeToggle />
 
         {/* Calendario de mes y año */}
         <MonthPicker />
@@ -1067,7 +1178,7 @@ export function BudgetTable({ onEditCategory }) {
                       <div className="category-cell-content">
                         <div
                           className="cat-icon-container"
-                          style={{ backgroundColor: meta.bgColor, color: meta.color }}
+                          style={{ backgroundColor: meta.bgColor, color: meta.textColor }}
                         >
                           <CategoryIcon name={meta.icon} size={18} />
                         </div>
@@ -3103,6 +3214,7 @@ export function BottomNav({ activePage, onNavigate }) {
 export default function DianaApp() {
   const [activePage, setActivePage] = useState("overview");
   const scrollRef = useRef(null);
+  const themeApi = useTheme();
 
   // Cambiar de sección empieza arriba; tocar la sección activa vuelve arriba (como en iOS)
   const navigate = (id) => {
@@ -3116,16 +3228,19 @@ export default function DianaApp() {
   };
 
   return (
-    <BudgetProvider>
-      <div className="app-layout">
-        <Sidebar activePage={activePage} onNavigate={navigate} />
-        <main className="main-content">
-          <div className="main-scroll" ref={scrollRef}>
-            {PAGES[activePage] || <Overview />}
-          </div>
-        </main>
-        <BottomNav activePage={activePage} onNavigate={navigate} />
-      </div>
-    </BudgetProvider>
+    <ThemeContext.Provider value={themeApi}>
+      <BudgetProvider>
+        <div className="app-layout">
+          <Sidebar activePage={activePage} onNavigate={navigate} />
+          <main className="main-content">
+            <div className="main-scroll" ref={scrollRef}>
+              {PAGES[activePage] || <Overview />}
+            </div>
+          </main>
+          <BottomNav activePage={activePage} onNavigate={navigate} />
+        </div>
+        <AppLoader />
+      </BudgetProvider>
+    </ThemeContext.Provider>
   );
 }

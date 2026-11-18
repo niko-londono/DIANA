@@ -93,6 +93,8 @@ src/
 | `DianaApp` | Componente raíz, envuelve en `BudgetProvider`, gestiona navegación y sidebar. |
 | `Sidebar` | Barra lateral con logo, navegación y botón de colapso. Solo en PC (> 1024px). |
 | `BottomNav` | Barra de navegación inferior tipo app con las 6 secciones, en celular y tablet (≤ 1024px). Tocar la sección activa vuelve arriba. |
+| `ThemeToggle` / `ThemeContext` | Botón sol/luna en el `Header` (todas las páginas) para cambiar entre modo claro y oscuro. El estado vive en `useTheme` (`diana-master.js`). |
+| `AppLoader` | Pantalla de carga con esfera animada mientras se trae el presupuesto de la nube (`isLoading`). Mínimo 900 ms visible y salida con desvanecido. |
 | `Header` | Barra superior con título, badge de sincronización y `MonthPicker`. |
 | `MonthPicker` | Calendario solo de meses y años (cuadrícula 3×4, flechas de año, botón "Mes actual", punto en meses con presupuesto). Cierra con Escape o clic fuera. |
 | `BudgetHero` | Cabecera con badge de balance cero/superávit/déficit, exportación CSV y botón "Nueva Categoría". |
@@ -109,7 +111,27 @@ src/
 
 ---
 
+## 🌗 4B. Tema Claro / Oscuro (cómo añadir estilos)
+
+- El tema se marca en `<html data-theme="light|dark">`. `index.html` lo aplica **antes** de cargar React (sin destello) y `useTheme` lo mantiene: preferencia guardada en `localStorage` (`finanzas_tema`) o, si no hay, el tema del sistema (y lo sigue si cambia).
+- **Regla para estilos nuevos: nunca escribir colores literales para superficies o texto.** Usar los tokens de `:root` (sección 1 de `diana-master.css`); el bloque `:root[data-theme="dark"]` (sección 1B) los redefine. Los más usados:
+  - Superficies: `--bg-app`, `--bg-card`, `--bg-card-alt`, `--bg-sunken`, `--bg-ink` (héroes oscuros), `--ink-border`.
+  - Texto: `--color-text-dark`, `--color-text`, `--color-text-soft`, `--color-text-muted`, `--color-text-light`.
+  - Verde: `--color-success` para **rellenos** (botones, barras); `--accent-text` para **texto** (en oscuro sube de luminosidad). Igual `--danger-text`, `--warning-text`, `--info-text`.
+  - Bordes: `--border-color`, `--border-color-light`, `--border-color-strong`.
+  - Fondos de estado y tintes de categoría: `--color-*-bg`, `--tint-*`, `--tint-*-text`.
+- En modo claro todos los tokens valen exactamente lo que valían los colores originales: el diseño claro no cambió.
+- El texto claro sobre superficies de tinta (`#f4f2ec`, `#8cc7a3`, etc.) se deja literal porque funciona en ambos temas.
+
+---
+
 ## 📝 5. Historial de Cambios y Actualizaciones
+
+### [v1.17.0] — 2026-11-17 (Modo oscuro y pantalla de carga)
+- **Modo oscuro en toda la app**: botón sol/luna en la barra superior (`ThemeToggle`, junto al indicador de sincronización). Paleta "libro contable de noche": carbón cálido (`#141311` / `#1c1b18`), nunca negro puro ni gris frío; los héroes de tinta pasan a ser más hondos que el fondo con un filo de luz; el verde de texto sube a `#7cc199` para mantener el contraste. Recuerda la elección (`finanzas_tema`) o sigue al sistema; actualiza el `theme-color` de la barra del navegador; transición suave solo durante el cambio.
+- **Tokenización**: ~230 colores literales de `diana-master.css` pasaron a tokens según la propiedad donde estaban (fondo, texto o borde), más los tintes de los badges de tipo (`getCategoryMeta` ahora devuelve `bgColor` y `textColor` como variables CSS). Ver sección 4B.
+- **Pantalla de carga** (`AppLoader`): mientras se sincroniza con la nube aparece una esfera de cristal con una forma interior que se deforma y cambia de color recorriendo la paleta de la app (verde pino → verde azulado → azul pizarra → arcilla), con "Preparando tu presupuesto · Sincronizando con la nube…". Adaptada de *young-walrus-64* de Andrew Manzyk (uiverse.io, licencia MIT). La forma usa una máscara SVG con filtro "gooey" nativo (`feGaussianBlur` + `feColorMatrix` animado) en lugar de `mask: url(#…)` de CSS, que Safari de iPhone no soporta bien. Respeta `prefers-reduced-motion`.
+- Verificado: build de Vite sin errores, escaneo de contraste de texto en Resumen, Proyección, Distribución y Tarjetas en modo oscuro (corregidos los casos bajo 4.5:1), revisión en escritorio (1366px) y móvil (375px), modal en oscuro, interruptor en ambos sentidos y consola sin errores. Pendiente de ver en un iPhone real.
 
 ### [v1.16.1] — 2026-11-17 (Campo de fecha en iPhone)
 - **Fecha de inicio en Proyección** (`diana-master.css`): en iOS Safari el `<input type="date">` nativo ignoraba `width: 100%` (tiene un ancho mínimo propio), se salía de la tarjeta por la derecha, centraba el texto y crecía en alto. Ahora `input[type="date"].goal-input` y `.form-input` usan `appearance: none`, `min-width: 0`, `max-width: 100%`, la misma altura que el resto de campos y el valor alineado a la izquierda (`::-webkit-date-and-time-value`). Aplica también al campo de fecha del modal de plantillas.
@@ -261,7 +283,7 @@ src/
 ## 💡 Guía Rápida para Futuras Modificaciones
 
 1. **Si quieres cambiar la apariencia, estilos, márgenes, colores o fuentes**:
-   Edita únicamente [`src/diana-master.css`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/src/diana-master.css).
+   Edita únicamente [`src/diana-master.css`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/src/diana-master.css). Usa tokens de color, no literales, y revisa el resultado también en modo oscuro (sección 4B).
 2. **Si quieres cambiar botones, añadir vistas, ventanas modales o componentes**:
    Edita únicamente [`src/diana-master.jsx`](file:///d:/NIKO/PROYECTOS-WEB-APP/REPOS/DIANA/src/diana-master.jsx).
 3. **Si quieres modificar fórmulas, añadir acciones al reducer, cambiar la URL de Google Sheets o agregar funciones de cálculo**:

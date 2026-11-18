@@ -27,7 +27,23 @@
         font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
       }
       * { -webkit-tap-highlight-color: transparent; }
+      html[data-theme="dark"], html[data-theme="dark"] body, html[data-theme="dark"] #root { background: #141311; }
     </style>
+    <script>
+      /* Aplica el tema guardado (o el del sistema) antes de pintar: sin destello blanco */
+      (function () {
+        var t = null;
+        try { t = localStorage.getItem("finanzas_tema"); } catch (e) {}
+        if (t !== "light" && t !== "dark") {
+          t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+        if (t === "dark") {
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute("content", "#141311");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

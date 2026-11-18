@@ -224,7 +224,8 @@ export function getCategoryMeta(cat) {
       icon: "default",
       badgeCls: "badge-variable",
       color: "#6f6c63",
-      bgColor: "#f0eee8"
+      bgColor: "var(--tint-neutral)",
+      textColor: "var(--tint-neutral-text)"
     };
   }
 
@@ -238,7 +239,8 @@ export function getCategoryMeta(cat) {
       icon: cat.icon || "cash",
       badgeCls: "badge-income",
       color: "#2f7a56",
-      bgColor: "#e9f1eb"
+      bgColor: "var(--color-success-bg)",
+      textColor: "var(--tint-income-text)"
     };
   }
 
@@ -252,7 +254,8 @@ export function getCategoryMeta(cat) {
       icon: cat.icon || "home",
       badgeCls: "badge-fixed",
       color: "#5a6f94",
-      bgColor: "#ebeef4"
+      bgColor: "var(--tint-fixed)",
+      textColor: "var(--tint-fixed-text)"
     };
   }
 
@@ -263,7 +266,8 @@ export function getCategoryMeta(cat) {
       icon: cat.icon || "travel",
       badgeCls: "badge-lifestyle",
       color: "#3d8a86",
-      bgColor: "#e7f1f0"
+      bgColor: "var(--tint-lifestyle)",
+      textColor: "var(--tint-lifestyle-text)"
     };
   }
 
@@ -274,7 +278,8 @@ export function getCategoryMeta(cat) {
       icon: cat.icon || "savings",
       badgeCls: "badge-wealth",
       color: "#c07447",
-      bgColor: "#f6ece4"
+      bgColor: "var(--tint-wealth)",
+      textColor: "var(--tint-wealth-text)"
     };
   }
 
@@ -284,7 +289,8 @@ export function getCategoryMeta(cat) {
     icon: cat.icon || "default",
     badgeCls: "badge-variable",
     color: "#46698c",
-    bgColor: "#eaeff4"
+    bgColor: "var(--color-info-bg)",
+      textColor: "var(--tint-variable-text)"
   };
 }
 
@@ -1432,4 +1438,69 @@ export function useBudget() {
   const ctx = useContext(BudgetContext);
   if (!ctx) throw new Error("useBudget must be used within BudgetProvider");
   return ctx;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. TEMA CLARO / OSCURO
+// ─────────────────────────────────────────────────────────────────────────────
+// Se guarda en localStorage (`finanzas_tema`: "light" | "dark"). Sin elección
+// guardada se sigue el tema del sistema, también si cambia con la app abierta.
+// index.html aplica el tema antes de que cargue React para evitar el destello.
+
+export const THEME_STORAGE_KEY = "finanzas_tema";
+const THEME_COLORS = { light: "#f4f2ec", dark: "#141311" };
+
+function readStoredTheme() {
+  try {
+    const v = localStorage.getItem(THEME_STORAGE_KEY);
+    return v === "light" || v === "dark" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function systemTheme() {
+  return typeof window !== "undefined" && window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme(theme, animate) {
+  const root = document.documentElement;
+  if (animate) {
+    root.classList.add("theme-switching");
+    clearTimeout(applyTheme.timer);
+    applyTheme.timer = setTimeout(() => root.classList.remove("theme-switching"), 400);
+  }
+  root.dataset.theme = theme;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", THEME_COLORS[theme]);
+}
+
+export function useTheme() {
+  const [theme, setTheme] = useState(() => readStoredTheme() || systemTheme());
+  const firstRun = useRef(true);
+
+  useEffect(() => {
+    applyTheme(theme, !firstRun.current);
+    firstRun.current = false;
+  }, [theme]);
+
+  // Sin elección guardada, acompaña al sistema
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = (e) => { if (!readStoredTheme()) setTheme(e.matches ? "dark" : "light"); };
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((t) => {
+      const next = t === "dark" ? "light" : "dark";
+      try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* modo privado */ }
+      return next;
+    });
+  }, []);
+
+  return { theme, toggleTheme };
 }
