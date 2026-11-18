@@ -990,8 +990,120 @@ function updateMonth(state, monthKey, updater) {
   return { ...state, byMonth: { ...state.byMonth, [monthKey]: updater(current) } };
 }
 
+// ── Propagación hacia meses posteriores ─────────────────────────────────────
+//
+// Regla: lo que se crea, edita o borra en un mes se mantiene en los meses siguientes,
+// salvo en el mes posterior donde esa misma categoría ya se había editado por su
+// cuenta; desde ahí en adelante manda ese mes ("y así sucesivamente").
+//
+// Cómo se decide que un mes posterior "solo estaba heredando": su categoría es igual
+// a como estaba en el mes editado ANTES del cambio. Si es distinta, ese mes tiene su
+// propia configuración y la propagación de esa categoría se detiene ahí.
+// Los meses que todavía no existen ya heredan solos del mes anterior más cercano.
+
+const PROPAGATED_ACTIONS = new Set([
+  "ADD_CATEGORY",
+  "UPDATE_CATEGORY",
+  "UPDATE_BUDGET",
+  "UPDATE_NAME",
+  "DELETE_CATEGORY",
+]);
+
+// Campos que forman la "configuración" de una categoría (expanded es solo visual)
+const CONFIG_FIELDS = ["name", "budgeted", "parentId", "type", "subtext", "icon", "canDelete"];
+
+function configValue(cat, field) {
+  const v = cat[field];
+  if (field === "budgeted") return Number(v) || 0;
+  if (field === "canDelete") return v !== false;
+  return v === undefined || v === null ? "" : String(v);
+}
+
+function sameConfig(a, b) {
+  return CONFIG_FIELDS.every((f) => configValue(a, f) === configValue(b, f));
+}
+
+function pickConfig(cat) {
+  const out = {};
+  CONFIG_FIELDS.forEach((f) => { out[f] = cat[f]; });
+  return out;
+}
+
+/**
+ * Aplica a los meses posteriores ya guardados el cambio hecho en `monthKey`.
+ * before/after: categorías de ese mes antes y después del cambio.
+ */
+export function propagateForward(byMonth, monthKey, before, after) {
+  const beforeById = new Map(before.map((c) => [c.id, c]));
+  const afterById = new Map(after.map((c) => [c.id, c]));
+
+  const changed = after.filter((c) => beforeById.has(c.id) && !sameConfig(beforeById.get(c.id), c));
+  const added = after.filter((c) => !beforeById.has(c.id));
+  const removed = before.filter((c) => !afterById.has(c.id));
+  if (changed.length === 0 && added.length === 0 && removed.length === 0) return byMonth;
+
+  const blocked = new Set(); // ids que ya encontraron un mes con configuración propia
+  const result = { ...byMonth };
+  const laterMonths = Object.keys(byMonth)
+    .filter((k) => k > monthKey && Array.isArray(byMonth[k]) && byMonth[k].length > 0)
+    .sort();
+
+  laterMonths.forEach((key) => {
+    let list = byMonth[key];
+    let touched = false;
+
+    // 1. Ediciones
+    changed.forEach((c) => {
+      if (blocked.has(c.id)) return;
+      const own = list.find((x) => x.id === c.id);
+      if (own && sameConfig(own, beforeById.get(c.id))) {
+        list = list.map((x) => (x.id === c.id ? { ...x, ...pickConfig(c) } : x));
+        touched = true;
+      } else {
+        blocked.add(c.id);
+      }
+    });
+
+    // 2. Borrados (si se borra un padre, también salen sus subcategorías en ese mes)
+    removed.forEach((c) => {
+      if (blocked.has(c.id)) return;
+      const own = list.find((x) => x.id === c.id);
+      if (!own) return; // ese mes ya no la tenía
+      if (sameConfig(own, c)) {
+        list = list.filter((x) => x.id !== c.id && x.parentId !== c.id);
+        touched = true;
+      } else {
+        blocked.add(c.id);
+      }
+    });
+
+    // 3. Altas (las subcategorías solo si su padre existe en ese mes)
+    added.forEach((c) => {
+      if (blocked.has(c.id)) return;
+      if (list.some((x) => x.id === c.id)) { blocked.add(c.id); return; }
+      if (c.parentId && !list.some((x) => x.id === c.parentId)) { blocked.add(c.id); return; }
+      list = [...list, { ...c, expanded: false }];
+      touched = true;
+    });
+
+    if (touched) result[key] = list;
+  });
+
+  return result;
+}
+
 // Todas las acciones reciben `monthKey` (lo agrega el Provider automáticamente)
 export function budgetReducer(state, action) {
+  const next = applyMonthAction(state, action);
+  if (next === state || !PROPAGATED_ACTIONS.has(action.type)) return next;
+  const monthKey = action.monthKey || getCurrentMonthKey();
+  const before = resolveMonthCategories(state.byMonth, monthKey);
+  const after = next.byMonth[monthKey] || [];
+  const byMonth = propagateForward(next.byMonth, monthKey, before, after);
+  return byMonth === next.byMonth ? next : { ...next, byMonth };
+}
+
+function applyMonthAction(state, action) {
   const monthKey = action.monthKey || getCurrentMonthKey();
 
   switch (action.type) {
