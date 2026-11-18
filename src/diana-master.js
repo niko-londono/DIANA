@@ -1094,6 +1094,47 @@ export function BudgetProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState("saved"); // "saved", "saving", "error"
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey); // "YYYY-MM"
+
+  // Volver siempre al mes actual por defecto. Al cargar ya se abre en el mes actual,
+  // pero en el celular la pestaña queda suspendida días enteros: al regresar mostraría
+  // el último mes que se miró (o el mes pasado si ya cambió el mes). Al volver a primer
+  // plano se regresa al mes actual si cambió el mes o si la app estuvo oculta un rato.
+  // Un cambio rápido de app (menos de AWAY_RESET_MS) respeta el mes que ella eligió.
+  useEffect(() => {
+    const AWAY_RESET_MS = 15 * 60 * 1000;
+    let hiddenAt = null;
+    let lastMonthKey = getCurrentMonthKey();
+
+    const backToCurrentMonth = () => {
+      const nowKey = getCurrentMonthKey();
+      const monthChanged = nowKey !== lastMonthKey;
+      const awayLong = hiddenAt !== null && Date.now() - hiddenAt >= AWAY_RESET_MS;
+      lastMonthKey = nowKey;
+      hiddenAt = null;
+      if (monthChanged || awayLong) setSelectedMonth(nowKey);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") hiddenAt = Date.now();
+      else backToCurrentMonth();
+    };
+    // Página restaurada desde la caché del navegador (atrás/adelante, pestaña dormida)
+    const onPageShow = (e) => {
+      if (e.persisted) setSelectedMonth(getCurrentMonthKey());
+    };
+    // Si la app queda abierta al cruzar de mes (medianoche del día 1)
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible" && getCurrentMonthKey() !== lastMonthKey) backToCurrentMonth();
+    }, 60 * 1000);
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pageshow", onPageShow);
+      clearInterval(timer);
+    };
+  }, []);
   const [templates, setTemplates] = useState(null); // plantillas de metas (null hasta cargar)
   const isFirstRender = useRef(true);
   // Solo se sube a la nube si la carga inicial desde la hoja funcionó. Si falló (sin red,
